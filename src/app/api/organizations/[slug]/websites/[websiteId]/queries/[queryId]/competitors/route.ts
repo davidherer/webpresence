@@ -55,12 +55,20 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
+  console.log("[Competitors API] === START === queryId:", queryId);
+
   const searchQuery = await checkSearchQueryAccess(
     user.id,
     slug,
     websiteId,
     queryId
   );
+
+  console.log(
+    "[Competitors API] searchQuery found:",
+    searchQuery ? `YES (query: ${searchQuery.query})` : "NO"
+  );
+
   if (!searchQuery) {
     return NextResponse.json(
       { success: false, error: "Search query not found" },
@@ -70,108 +78,142 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Get the search query string
   const queryString = searchQuery.query;
+  const queryStringLower = queryString.toLowerCase();
 
-  // Get our SERP results for this search query
-  const ourSerpResults = await prisma.serpResult.findMany({
+  console.log("[Competitors API] Query string:", queryString);
+  console.log("[Competitors API] SearchQuery ID:", queryId);
+
+  // Debug: Get all SERP results related to this searchQueryId to understand the data
+  const allOurSerpResults = await prisma.serpResult.findMany({
     where: { searchQueryId: queryId },
-    orderBy: { createdAt: "desc" },
     select: { query: true, position: true, createdAt: true },
   });
-
-  // Get unique queries and our latest position for each
-  const ourPositionsByKeyword = new Map<string, number | null>();
-  for (const result of ourSerpResults) {
-    const queryLower = result.query.toLowerCase();
-    if (!ourPositionsByKeyword.has(queryLower)) {
-      ourPositionsByKeyword.set(queryLower, result.position);
-    }
+  console.log(
+    `[Competitors API] Found ${allOurSerpResults.length} SERP results for our searchQueryId`
+  );
+  if (allOurSerpResults.length > 0) {
+    console.log(
+      `[Competitors API] Sample: query="${allOurSerpResults[0].query}", position=${allOurSerpResults[0].position}`
+    );
   }
 
-  // Get all competitors for this website
+  // Get all unique query strings from our SERP results
+  const ourQueries = [
+    ...new Set(allOurSerpResults.map((r) => r.query.toLowerCase())),
+  ];
+  console.log(
+    `[Competitors API] Tracking ${ourQueries.length} unique query strings:`,
+    ourQueries
+  );
+
+  // Get our latest SERP result for this search query
+  const ourLatestSerpResult = await prisma.serpResult.findFirst({
+    where: { searchQueryId: queryId },
+    orderBy: { createdAt: "desc" },
+    select: { position: true, query: true },
+  });
+
+  console.log("[Competitors API] Our latest SERP result:", ourLatestSerpResult);
+
+  const ourPosition = ourLatestSerpResult?.position ?? 0;
+
+  // Get all competitors for this website that have SERP results for this exact query
   const websiteCompetitors = await prisma.competitor.findMany({
     where: { websiteId, isActive: true },
     select: { id: true, name: true, url: true, description: true },
   });
 
-  // For each competitor, get their SERP positions
+  console.log(
+    `[Competitors API] Found ${websiteCompetitors.length} competitors for website`
+  );
+
+  // Debug: Check how many competitors have SERP results for our tracked queries
+  const competitorSerpCount = await prisma.serpResult.count({
+    where: {
+      competitorId: { in: websiteCompetitors.map((c) => c.id) },
+      query: { in: ourQueries },
+    },
+  });
+  console.log(
+    `[Competitors API] Found ${competitorSerpCount} competitor SERP results matching our queries`
+  );
+
+  // Debug: See what queries competitors actually have
+  const competitorQueries = await prisma.serpResult.findMany({
+    where: {
+      competitorId: { in: websiteCompetitors.map((c) => c.id) },
+    },
+    select: { query: true },
+    distinct: ["query"],
+    take: 10,
+  });
+  console.log(
+    `[Competitors API] Sample competitor queries:`,
+    competitorQueries.map((r) => r.query)
+  );
+  console.log(
+    `[Competitors API] ⚠️ MISMATCH: We track "${ourQueries[0]}" but competitors have different queries!`
+  );
+
+  // For each competitor, get their SERP position for ANY of our tracked queries
   const competitorData = await Promise.all(
     websiteCompetitors.map(async (competitor) => {
-      // Get competitor's SERP results
-      const competitorSerpResults = await prisma.serpResult.findMany({
-        where: { competitorId: competitor.id },
+      // Get competitor's latest SERP result for any of our tracked queries
+      const competitorSerpResult = await prisma.serpResult.findFirst({
+        where: {
+          competitorId: competitor.id,
+          query: {
+            in: ourQueries,
+          },
+        },
         orderBy: { createdAt: "desc" },
-        select: { query: true, position: true },
+        select: { position: true, query: true },
       });
 
-      // Build map of competitor's latest position per query
-      const theirPositionsByKeyword = new Map<string, number | null>();
-      for (const result of competitorSerpResults) {
-        const queryLower = result.query.toLowerCase();
-        if (!theirPositionsByKeyword.has(queryLower)) {
-          theirPositionsByKeyword.set(queryLower, result.position);
-        }
+      const competitorPosition = competitorSerpResult?.position ?? 0;
+
+      if (competitorSerpResult) {
+        console.log(
+          `[Competitors API] ✓ ${competitor.name}: position ${competitorPosition} for "${competitorSerpResult.query}"`
+        );
       }
 
-      // Get all queries from our search query
-      const allQueries = [...ourPositionsByKeyword.keys()];
+      // Calculate difference based on presence
+      let difference: number;
+      let weAreBetter: boolean;
 
-      // Build comparison for queries where we have data
-      const comparison = allQueries
-        .map((query) => {
-          const ourPos = ourPositionsByKeyword.get(query);
-          const theirPos = theirPositionsByKeyword.get(query);
+      if (ourPosition > 0 && competitorPosition === 0) {
+        // We are present, they are not
+        difference = 100;
+        weAreBetter = true;
+      } else if (ourPosition === 0 && competitorPosition > 0) {
+        // They are present, we are not
+        difference = -100;
+        weAreBetter = false;
+      } else if (ourPosition > 0 && competitorPosition > 0) {
+        // Both present - compare positions
+        difference = competitorPosition - ourPosition;
+        weAreBetter = ourPosition < competitorPosition;
+      } else {
+        // Both absent
+        difference = 0;
+        weAreBetter = false;
+      }
 
-          // Handle positions
-          const ourPosition =
-            ourPos !== null && ourPos !== undefined && ourPos > 0 ? ourPos : 0;
-          const competitorPosition =
-            theirPos !== null && theirPos !== undefined && theirPos > 0
-              ? theirPos
-              : 0;
+      const comparison = competitorSerpResult
+        ? [
+            {
+              keyword: queryString,
+              ourPosition,
+              competitorPosition,
+              difference,
+              weAreBetter,
+            },
+          ]
+        : [];
 
-          // Calculate difference based on presence
-          let difference: number;
-          let weAreBetter: boolean;
-
-          if (ourPosition > 0 && competitorPosition === 0) {
-            // We are present, they are not
-            difference = 100;
-            weAreBetter = true;
-          } else if (ourPosition === 0 && competitorPosition > 0) {
-            // They are present, we are not
-            difference = -100;
-            weAreBetter = false;
-          } else if (ourPosition > 0 && competitorPosition > 0) {
-            // Both present - compare positions
-            difference = competitorPosition - ourPosition;
-            weAreBetter = ourPosition < competitorPosition;
-          } else {
-            // Both absent
-            difference = 0;
-            weAreBetter = false;
-          }
-
-          return {
-            keyword: query,
-            ourPosition,
-            competitorPosition,
-            difference,
-            weAreBetter,
-          };
-        })
-        .filter((c) => c.ourPosition > 0 || c.competitorPosition > 0); // Only include if at least one is present
-
-      // Calculate shared keywords (where both have data)
-      const sharedKeywords = comparison.filter(
-        (c) => c.ourPosition > 0 && c.competitorPosition > 0
-      ).length;
-
-      // Average position difference
-      const avgDifference =
-        comparison.length > 0
-          ? comparison.reduce((sum, c) => sum + c.difference, 0) /
-            comparison.length
-          : 0;
+      // Si on a trouvé un SerpResult pour ce concurrent, c'est qu'il partage cette requête
+      const sharedKeywords = competitorSerpResult ? 1 : 0;
 
       return {
         id: competitor.id,
@@ -181,15 +223,31 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
         sharedKeywords,
         totalKeywordsTracked: comparison.length,
         comparison,
-        avgDifference,
-        threat:
-          avgDifference > 5 ? "low" : avgDifference > 0 ? "medium" : "high",
+        avgDifference: difference,
+        threat: difference > 5 ? "low" : difference > 0 ? "medium" : "high",
       };
     })
   );
 
+  // Filter out competitors with no shared keywords (not relevant to this query)
+  const relevantCompetitors = competitorData.filter(
+    (c) => c.comparison.length > 0
+  );
+
+  console.log(
+    `[Competitors API] Filtered to ${relevantCompetitors.length} relevant competitors`
+  );
+  if (relevantCompetitors.length > 0) {
+    console.log(
+      "[Competitors API] Relevant:",
+      relevantCompetitors
+        .map((c) => `${c.name} (${c.sharedKeywords} shared)`)
+        .join(", ")
+    );
+  }
+
   // Sort by threat level (high first) and number of shared keywords
-  competitorData.sort((a, b) => {
+  relevantCompetitors.sort((a, b) => {
     const threatOrder = { high: 0, medium: 1, low: 2 };
     const threatDiff =
       threatOrder[a.threat as keyof typeof threatOrder] -
@@ -201,15 +259,16 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   return NextResponse.json({
     success: true,
     data: {
-      competitors: competitorData,
+      competitors: relevantCompetitors,
       summary: {
-        totalCompetitors: competitorData.length,
-        highThreat: competitorData.filter((c) => c.threat === "high").length,
-        mediumThreat: competitorData.filter((c) => c.threat === "medium")
+        totalCompetitors: relevantCompetitors.length,
+        highThreat: relevantCompetitors.filter((c) => c.threat === "high")
           .length,
-        lowThreat: competitorData.filter((c) => c.threat === "low").length,
+        mediumThreat: relevantCompetitors.filter((c) => c.threat === "medium")
+          .length,
+        lowThreat: relevantCompetitors.filter((c) => c.threat === "low").length,
         searchQuery: queryString,
-        searchedQueries: [...ourPositionsByKeyword.keys()],
+        searchedQueries: [queryString],
       },
     },
   });

@@ -521,21 +521,25 @@ async function seed() {
 
   // Nettoyer la base de données
   console.log("🧹 Nettoyage de la base de données...");
-  await prisma.aISuggestion.deleteMany();
-  await prisma.aIReport.deleteMany();
-  await prisma.serpResult.deleteMany();
-  await prisma.competitorPageAnalysis.deleteMany();
-  await prisma.pageAnalysis.deleteMany();
-  await prisma.analysisJob.deleteMany();
-  await prisma.searchQuery.deleteMany();
-  await prisma.competitor.deleteMany();
-  await prisma.website.deleteMany();
-  await prisma.organizationMember.deleteMany();
-  await prisma.organization.deleteMany();
-  await prisma.userSession.deleteMany();
-  await prisma.userAuthCode.deleteMany();
-  await prisma.user.deleteMany();
-  console.log("✅ Base de données nettoyée\n");
+  try {
+    await prisma.aISuggestion.deleteMany();
+    await prisma.aIReport.deleteMany();
+    await prisma.serpResult.deleteMany();
+    await prisma.competitorPageAnalysis.deleteMany();
+    await prisma.pageAnalysis.deleteMany();
+    await prisma.analysisJob.deleteMany();
+    await prisma.searchQuery.deleteMany();
+    await prisma.competitor.deleteMany();
+    await prisma.website.deleteMany();
+    await prisma.organizationMember.deleteMany();
+    await prisma.organization.deleteMany();
+    await prisma.userSession.deleteMany();
+    await prisma.userAuthCode.deleteMany();
+    await prisma.user.deleteMany();
+    console.log("✅ Base de données nettoyée\n");
+  } catch (error) {
+    console.log("⚠️ Base de données déjà vide ou erreur lors du nettoyage\n");
+  }
 
   let totalSearchQueries = 0;
   let totalCompetitors = 0;
@@ -753,14 +757,11 @@ async function seed() {
       // Chaque concurrent a une "force SEO" de base qui influence ses positions
       const competitorStrength = randomFloat(0.3, 1.2); // < 1 = plus faible, > 1 = plus fort
 
-      // Suivre les positions du concurrent sur une sélection de produits/mots-clés
-      const trackedQueries = searchQueries.slice(
-        0,
-        Math.min(30, searchQueries.length)
-      ); // Top 30 requêtes suivies
+      // Suivre les positions du concurrent sur TOUTES les requêtes que nous trackons
+      const trackedQueries = searchQueries;
       const checksPerKeyword = Math.floor(
-        (totalWeeks * CONFIG.SERP_CHECKS_PER_WEEK) / 2
-      ); // ~78 checks par keyword/an
+        (totalWeeks * CONFIG.SERP_CHECKS_PER_WEEK) / 8
+      ); // ~20 checks par keyword/an (réduit car plus de keywords)
 
       for (const sq of trackedQueries) {
         // Position de base du concurrent pour ce mot-clé
