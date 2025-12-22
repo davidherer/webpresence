@@ -1,7 +1,9 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { use } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
@@ -17,81 +19,123 @@ import {
   Minus,
   ExternalLink,
   RefreshCw,
+  AlertCircle,
 } from "lucide-react";
-
-// Disable caching for this page
-export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string }>;
 }
 
-export default async function WebsitePage({ params }: PageProps) {
-  const { slug, websiteId } = await params;
-  const user = await getUserSession();
-  if (!user) redirect("/");
+interface SerpResult {
+  position: number | null;
+  createdAt: Date;
+}
 
-  // Check access
-  const membership = await prisma.organizationMember.findFirst({
-    where: {
-      userId: user.id,
-      organization: { slug },
-    },
-    include: { organization: true },
-  });
-
-  if (!membership) notFound();
-
-  // Fetch website
-  const website = await prisma.website.findFirst({
-    where: {
-      id: websiteId,
-      organizationId: membership.organization.id,
-    },
-    include: {
-      products: {
-        where: { isActive: true },
-        include: {
-          serpResults: {
-            orderBy: { createdAt: "desc" },
-            take: 2,
-          },
-          _count: { select: { aiSuggestions: { where: { status: "pending" } } } },
-        },
-      },
-      competitors: {
-        where: { isActive: true },
-        include: {
-          serpResults: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-          },
-        },
-      },
-      aiReports: {
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-    },
-  });
-
-  if (!website) notFound();
-
-  // Get trend for a product (comparing last 2 SERP results)
-  const getTrend = (serpResults: { position: number | null }[]) => {
-    if (serpResults.length < 2) return null;
-    const current = serpResults[0]?.position;
-    const previous = serpResults[1]?.position;
-    if (current === null || previous === null) return null;
-    return previous - current; // Positive = improvement (lower position is better)
+interface Product {
+  id: string;
+  name: string;
+  keywords: string[];
+  serpResults: SerpResult[];
+  _count: {
+    aiSuggestions: number;
   };
+}
 
-  const getTrendIcon = (trend: number | null) => {
-    if (trend === null) return <Minus className="w-4 h-4 text-muted-foreground" />;
-    if (trend > 0) return <TrendingUp className="w-4 h-4 text-green-500" />;
-    if (trend < 0) return <TrendingDown className="w-4 h-4 text-red-500" />;
-    return <Minus className="w-4 h-4 text-muted-foreground" />;
-  };
+interface Competitor {
+  id: string;
+  name: string;
+  url: string;
+  serpResults: SerpResult[];
+}
+
+interface AIReport {
+  id: string;
+  type: string;
+  title: string;
+  createdAt: Date;
+}
+
+interface Website {
+  id: string;
+  name: string;
+  url: string;
+  status: string;
+  products: Product[];
+  competitors: Competitor[];
+  aiReports: AIReport[];
+}
+
+interface WebsiteData {
+  website: Website;
+}
+
+// Get trend for a product (comparing last 2 SERP results)
+const getTrend = (serpResults: { position: number | null }[]) => {
+  if (serpResults.length < 2) return null;
+  const current = serpResults[0]?.position;
+  const previous = serpResults[1]?.position;
+  if (current === null || previous === null) return null;
+  return previous - current; // Positive = improvement (lower position is better)
+};
+
+const getTrendIcon = (trend: number | null) => {
+  if (trend === null) return <Minus className="w-4 h-4 text-muted-foreground" />;
+  if (trend > 0) return <TrendingUp className="w-4 h-4 text-green-500" />;
+  if (trend < 0) return <TrendingDown className="w-4 h-4 text-red-500" />;
+  return <Minus className="w-4 h-4 text-muted-foreground" />;
+};
+
+export default function WebsitePage({ params }: PageProps) {
+  const { slug, websiteId } = use(params);
+  const router = useRouter();
+  const [data, setData] = useState<WebsiteData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const response = await fetch(`/api/organizations/${slug}/websites/${websiteId}/dashboard`);
+        if (response.ok) {
+          const websiteData = await response.json();
+          setData(websiteData);
+        } else {
+          setError(true);
+        }
+      } catch (err) {
+        console.error("Failed to load website data:", err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [slug, websiteId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <p className="text-lg text-muted-foreground">Site web introuvable</p>
+        <Link href={`/dashboard/o/${slug}`}>
+          <Button className="mt-4" variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour à l&apos;organisation
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const { website } = data;
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">

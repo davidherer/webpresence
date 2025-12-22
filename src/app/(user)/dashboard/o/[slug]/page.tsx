@@ -1,7 +1,9 @@
-import { notFound, redirect } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
-import { prisma } from "@/lib/db";
-import { getUserSession } from "@/lib/auth/user";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Globe, Users, Settings, ArrowLeft, BarChart3, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
@@ -10,44 +12,42 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default async function OrganizationPage({ params }: PageProps) {
-  const { slug } = await params;
-  const user = await getUserSession();
-  if (!user) redirect("/");
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  status: string;
+}
 
-  // Check access
-  const membership = await prisma.organizationMember.findFirst({
-    where: {
-      userId: user.id,
-      organization: { slug },
-    },
-    include: {
-      organization: true,
-    },
-  });
+interface Website {
+  id: string;
+  name: string;
+  url: string;
+  status: string;
+  _count: {
+    products: number;
+    competitors: number;
+    aiReports: number;
+  };
+}
 
-  if (!membership) notFound();
+interface Member {
+  id: string;
+  role: string;
+  user: {
+    email: string;
+    name: string | null;
+  };
+}
 
-  const { organization, role } = membership;
+interface OrganizationData {
+  organization: Organization;
+  role: string;
+  websites: Website[];
+  members: Member[];
+}
 
-  // Fetch websites with stats
-  const websites = await prisma.website.findMany({
-    where: { organizationId: organization.id },
-    include: {
-      _count: { select: { products: true, competitors: true, aiReports: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  // Fetch members
-  const members = await prisma.organizationMember.findMany({
-    where: { organizationId: organization.id },
-    include: { user: { select: { email: true, name: true } } },
-  });
-
-  const isOwnerOrAdmin = ["owner", "admin"].includes(role);
-
-  const getStatusIcon = (status: string) => {
+const getStatusIcon = (status: string) => {
     switch (status) {
       case "active":
         return <CheckCircle2 className="w-4 h-4 text-green-500" />;
@@ -72,6 +72,61 @@ export default async function OrganizationPage({ params }: PageProps) {
         return "En attente";
     }
   };
+
+export default function OrganizationPage({ params }: PageProps) {
+  const { slug } = use(params);
+  const router = useRouter();
+  const [data, setData] = useState<OrganizationData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const response = await fetch(`/api/organizations/${slug}/dashboard`);
+        if (response.ok) {
+          const organizationData = await response.json();
+          setData(organizationData);
+        } else if (response.status === 404) {
+          setError(true);
+        } else {
+          setError(true);
+        }
+      } catch (err) {
+        console.error("Failed to load organization data:", err);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen">
+        <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+        <p className="text-lg text-muted-foreground">Organisation introuvable</p>
+        <Link href="/dashboard">
+          <Button className="mt-4" variant="outline">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour au dashboard
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const { organization, role, websites, members } = data;
+  const isOwnerOrAdmin = ["owner", "admin"].includes(role);
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
