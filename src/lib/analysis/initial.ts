@@ -49,11 +49,11 @@ export async function runInitialAnalysis(
       },
     });
 
-    // Step 2: Select key pages to analyze (max 20 for initial analysis)
+    // Step 2: Select key pages to analyze (just homepage for initial analysis)
     const urlsToAnalyze = selectKeyPages(
       sitemap.urls.map((u) => u.loc),
       website.url,
-      20
+      1
     );
 
     console.log(`[Analysis] Analyzing ${urlsToAnalyze.length} pages`);
