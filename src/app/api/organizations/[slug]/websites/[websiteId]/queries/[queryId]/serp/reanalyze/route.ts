@@ -4,19 +4,19 @@ import { withUserAuth } from "@/lib/api/middleware";
 import { reanalyzeSerpFromBlob } from "@/lib/analysis/serp";
 
 interface RouteContext {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
 interface AuthRequest extends Request {
   user: { id: string; email: string };
 }
 
-// Helper to check product access
-async function checkProductAccess(
+// Helper to check search query access
+async function checkSearchQueryAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string
+  queryId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
     where: {
@@ -29,40 +29,45 @@ async function checkProductAccess(
     return null;
   }
 
-  const product = await prisma.product.findFirst({
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       websiteId,
       website: { organizationId: membership.organizationId },
     },
     include: { website: true },
   });
 
-  return product;
+  return searchQuery;
 }
 
 /**
- * POST /api/organizations/:slug/websites/:websiteId/products/:productId/serp/reanalyze
+ * POST /api/organizations/:slug/websites/:websiteId/queries/:queryId/serp/reanalyze
  * Re-analyze stored SERP data to re-extract competitors (without calling BrightData)
  */
 export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
   try {
     console.log(
-      `[SERP Reanalyze POST] Starting re-analysis for product ${productId}`
+      `[SERP Reanalyze POST] Starting re-analysis for search query ${queryId}`
     );
 
-    const result = await reanalyzeSerpFromBlob(websiteId, productId);
+    const result = await reanalyzeSerpFromBlob(websiteId, queryId);
 
     return NextResponse.json({
       success: true,

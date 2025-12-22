@@ -47,7 +47,7 @@ export const GET = withUserAuth(
       include: {
         _count: {
           select: {
-            products: true,
+            searchQueries: true,
             competitors: true,
           },
         },
@@ -64,7 +64,7 @@ export const GET = withUserAuth(
         status: w.status,
         sitemapUrl: w.sitemapUrl,
         lastSitemapFetch: w.lastSitemapFetch,
-        productCount: w._count.products,
+        queryCount: w._count.searchQueries,
         competitorCount: w._count.competitors,
         createdAt: w.createdAt,
         updatedAt: w.updatedAt,

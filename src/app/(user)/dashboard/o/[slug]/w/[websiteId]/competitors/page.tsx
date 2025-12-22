@@ -24,11 +24,11 @@ async function computeCompetitorScore(
   competitorId: string,
   websiteId: string
 ): Promise<{ better: number; worse: number; total: number }> {
-  // Get our latest SERP positions (from products)
+  // Get our latest SERP positions (from search queries)
   const ourResults = await prisma.serpResult.findMany({
     where: {
-      product: { websiteId, isActive: true },
-      productId: { not: null },
+      searchQuery: { websiteId, isActive: true },
+      searchQueryId: { not: null },
     },
     orderBy: { createdAt: "desc" },
     select: { query: true, position: true },

@@ -9,8 +9,8 @@ const CONFIG = {
   NUM_ORGANIZATIONS: 3,
   USERS_PER_ORG: 5,
 
-  // Produits/Services
-  PRODUCTS_PER_WEBSITE: 120, // ~360 produits au total (3 orgs)
+  // Requêtes de recherche
+  SEARCH_QUERIES_PER_WEBSITE: 120, // ~360 requêtes au total (3 orgs)
 
   // Concurrents
   COMPETITORS_PER_WEBSITE: 50, // ~150 concurrents au total
@@ -27,7 +27,7 @@ const CONFIG = {
   AI_REPORTS_PER_WEBSITE: 24, // 2 par mois sur 1 an
 
   // Suggestions IA
-  SUGGESTIONS_PER_PRODUCT: 5,
+  SUGGESTIONS_PER_QUERY: 5,
 };
 
 // Données réalistes
@@ -35,37 +35,37 @@ const INDUSTRIES = [
   {
     name: "E-commerce Mode",
     domain: "fashionstore.fr",
-    products: [
-      "Robes été",
-      "Pantalons chino",
-      "Chemises lin",
-      "Vestes cuir",
-      "Pulls cachemire",
-      "Jupes plissées",
-      "T-shirts bio",
-      "Shorts denim",
-      "Manteaux hiver",
-      "Blazers femme",
-      "Jeans slim",
-      "Cardigans",
-      "Débardeurs",
-      "Combinaisons",
-      "Salopettes",
-      "Leggins sport",
-      "Sweats capuche",
-      "Pyjamas soie",
-      "Maillots bain",
-      "Lingerie dentelle",
-      "Chaussettes bambou",
-      "Écharpes cachemire",
-      "Bonnets laine",
-      "Gants cuir",
-      "Ceintures",
-      "Sacs à main",
-      "Portefeuilles",
-      "Bijoux fantaisie",
-      "Montres femme",
-      "Lunettes soleil",
+    searchQueries: [
+      "robes été femme",
+      "pantalon chino homme",
+      "chemise lin homme",
+      "veste cuir femme",
+      "pull cachemire",
+      "jupe plissée midi",
+      "t-shirt bio coton",
+      "short denim femme",
+      "manteau hiver femme",
+      "blazer femme tendance",
+      "jean slim homme",
+      "cardigan laine",
+      "débardeur femme",
+      "combinaison pantalon",
+      "salopette jean",
+      "legging sport femme",
+      "sweat capuche oversize",
+      "pyjama soie femme",
+      "maillot de bain 2 pièces",
+      "lingerie dentelle",
+      "chaussettes bambou",
+      "écharpe cachemire",
+      "bonnet laine mérinos",
+      "gants cuir homme",
+      "ceinture cuir",
+      "sac à main cuir",
+      "portefeuille homme",
+      "bijoux fantaisie femme",
+      "montre femme tendance",
+      "lunettes soleil polarisées",
     ],
     keywords: [
       "mode",
@@ -103,39 +103,37 @@ const INDUSTRIES = [
   {
     name: "Agence Web",
     domain: "webagency-pro.com",
-    products: [
-      "Création site vitrine",
-      "Développement e-commerce",
-      "Application mobile",
-      "Refonte site web",
-      "SEO technique",
-      "SEO local",
-      "Audit SEO",
-      "Stratégie netlinking",
-      "Rédaction SEO",
-      "Google Ads",
-      "Facebook Ads",
-      "LinkedIn Ads",
-      "Publicité programmatique",
-      "Retargeting",
-      "Community management",
-      "Stratégie social media",
-      "Création contenu",
-      "Vidéo marketing",
-      "Email marketing",
-      "Marketing automation",
-      "CRM intégration",
-      "Analytics avancé",
-      "UX design",
-      "UI design",
-      "Design system",
-      "Prototypage",
-      "Tests utilisateurs",
-      "Maintenance web",
-      "Hébergement",
-      "Sécurité web",
-      "Performance web",
-      "Accessibilité",
+    searchQueries: [
+      "création site vitrine prix",
+      "développement site e-commerce",
+      "application mobile sur mesure",
+      "refonte site web wordpress",
+      "audit seo technique",
+      "référencement local google",
+      "agence seo paris",
+      "stratégie netlinking",
+      "rédaction contenu seo",
+      "agence google ads",
+      "publicité facebook ads",
+      "campagne linkedin ads",
+      "publicité programmatique",
+      "retargeting publicitaire",
+      "community manager freelance",
+      "stratégie réseaux sociaux",
+      "création contenu digital",
+      "vidéo marketing entreprise",
+      "email marketing automation",
+      "marketing automation b2b",
+      "intégration crm hubspot",
+      "google analytics consultant",
+      "ux designer freelance",
+      "ui design application",
+      "design system entreprise",
+      "prototype figma",
+      "tests utilisateurs ux",
+      "maintenance site wordpress",
+      "hébergement site web",
+      "sécurité site wordpress",
     ],
     keywords: [
       "agence web",
@@ -172,40 +170,36 @@ const INDUSTRIES = [
   {
     name: "SaaS B2B",
     domain: "saas-solutions.io",
-    products: [
-      "CRM entreprise",
-      "ERP cloud",
-      "Gestion projet",
-      "Facturation en ligne",
-      "Comptabilité SaaS",
-      "GED document",
-      "Signature électronique",
-      "Workflow automation",
-      "RH management",
-      "Paie cloud",
-      "Ticketing support",
-      "Live chat",
-      "Base connaissances",
-      "Feedback client",
-      "NPS surveys",
-      "Analytics dashboard",
-      "Business intelligence",
-      "Data visualization",
-      "Reporting automatisé",
-      "API management",
-      "Integration platform",
-      "ETL cloud",
-      "Data warehouse",
-      "Machine learning",
-      "Collaboration équipe",
-      "Visioconférence",
-      "Messagerie entreprise",
-      "Intranet moderne",
-      "Sécurité endpoint",
-      "IAM solution",
-      "SIEM cloud",
-      "Backup cloud",
-      "Disaster recovery",
+    searchQueries: [
+      "crm entreprise pme",
+      "erp cloud tpe",
+      "logiciel gestion projet",
+      "facturation en ligne auto-entrepreneur",
+      "logiciel comptabilité saas",
+      "ged documentaire cloud",
+      "signature électronique légale",
+      "workflow automation entreprise",
+      "logiciel rh pme",
+      "logiciel paie cloud",
+      "outil ticketing support",
+      "live chat site web",
+      "base de connaissances interne",
+      "outil feedback client",
+      "enquête nps satisfaction",
+      "tableau de bord analytics",
+      "solution business intelligence",
+      "outil data visualization",
+      "reporting automatisé entreprise",
+      "api management platform",
+      "plateforme intégration saas",
+      "outil etl cloud",
+      "data warehouse moderne",
+      "machine learning entreprise",
+      "outil collaboration équipe",
+      "solution visioconférence",
+      "messagerie instantanée entreprise",
+      "intranet collaboratif",
+      "sécurité endpoint entreprise",
     ],
     keywords: [
       "SaaS",
@@ -297,49 +291,33 @@ function generateKeywords(
   return shuffled.slice(0, randomInt(3, 8));
 }
 
-function generateSearchQuery(productName: string, keywords: string[]): string {
+function generatePageTitle(queryTitle: string): string {
   const templates = [
-    `${productName}`,
-    `${productName} pas cher`,
-    `acheter ${productName}`,
-    `meilleur ${productName}`,
-    `${productName} en ligne`,
-    `${productName} ${randomElement(keywords)}`,
-    `comparatif ${productName}`,
-    `avis ${productName}`,
-    `${productName} livraison rapide`,
-    `${productName} France`,
+    `${queryTitle} - Découvrez notre sélection`,
+    `${queryTitle} | Meilleurs prix garantis`,
+    `${queryTitle} en ligne`,
+    `${queryTitle} - Livraison gratuite`,
+    `${queryTitle} de qualité supérieure`,
   ];
   return randomElement(templates);
 }
 
-function generatePageTitle(productName: string): string {
+function generateMetaDescription(queryTitle: string): string {
   const templates = [
-    `${productName} - Découvrez notre sélection`,
-    `${productName} | Meilleurs prix garantis`,
-    `Achetez ${productName} en ligne`,
-    `${productName} - Livraison gratuite`,
-    `${productName} de qualité supérieure`,
+    `Découvrez notre gamme de ${queryTitle}. Qualité premium, prix compétitifs. Livraison en 24h.`,
+    `${queryTitle} - Large sélection disponible. Satisfait ou remboursé. Commandez maintenant !`,
+    `Trouvez le ${queryTitle} idéal parmi notre collection. Conseils d'experts et service client premium.`,
+    `Achetez ${queryTitle} au meilleur prix. Plus de 1000 avis clients. Retours gratuits sous 30 jours.`,
   ];
   return randomElement(templates);
 }
 
-function generateMetaDescription(productName: string): string {
-  const templates = [
-    `Découvrez notre gamme de ${productName}. Qualité premium, prix compétitifs. Livraison en 24h.`,
-    `${productName} - Large sélection disponible. Satisfait ou remboursé. Commandez maintenant !`,
-    `Trouvez le ${productName} idéal parmi notre collection. Conseils d'experts et service client premium.`,
-    `Achetez ${productName} au meilleur prix. Plus de 1000 avis clients. Retours gratuits sous 30 jours.`,
-  ];
-  return randomElement(templates);
-}
-
-function generateHeadings(productName: string): object {
+function generateHeadings(queryTitle: string): object {
   return {
-    h1: [`${productName}`],
+    h1: [`${queryTitle}`],
     h2: [
-      `Pourquoi choisir notre ${productName}`,
-      `Caractéristiques du ${productName}`,
+      `Pourquoi choisir notre ${queryTitle}`,
+      `Caractéristiques de ${queryTitle}`,
       `Avis clients`,
       `Questions fréquentes`,
     ],
@@ -353,11 +331,11 @@ function generateHeadings(productName: string): object {
 }
 
 function generateKeywordsJson(
-  productName: string,
+  queryTitle: string,
   baseKeywords: string[]
 ): object {
   const keywords: Record<string, number> = {};
-  const allWords = [...productName.toLowerCase().split(" "), ...baseKeywords];
+  const allWords = [...queryTitle.toLowerCase().split(" "), ...baseKeywords];
 
   allWords.forEach((word) => {
     keywords[word] = randomInt(5, 50);
@@ -455,53 +433,53 @@ function generateAIReportContent(
 
 function generateAISuggestion(
   type: string,
-  productName: string
+  queryTitle: string
 ): { title: string; content: string } {
   const templates: Record<string, { title: string; content: string }[]> = {
     content: [
       {
-        title: `Créer un guide d'achat pour ${productName}`,
-        content: `Rédiger un guide complet de 2000+ mots couvrant les critères de choix, les différentes gammes de prix, et des conseils d'experts pour aider les utilisateurs à choisir le bon ${productName}.`,
+        title: `Créer un guide complet pour "${queryTitle}"`,
+        content: `Rédiger un guide complet de 2000+ mots couvrant les critères de choix, les différentes gammes de prix, et des conseils d'experts pour aider les utilisateurs recherchant "${queryTitle}".`,
       },
       {
-        title: `Ajouter une FAQ sur ${productName}`,
-        content: `Créer une section FAQ avec les 10 questions les plus fréquentes des clients concernant ${productName}. Utiliser le schema markup FAQ pour améliorer la visibilité SERP.`,
+        title: `Ajouter une FAQ sur "${queryTitle}"`,
+        content: `Créer une section FAQ avec les 10 questions les plus fréquentes concernant "${queryTitle}". Utiliser le schema markup FAQ pour améliorer la visibilité SERP.`,
       },
       {
-        title: `Enrichir la description de ${productName}`,
-        content: `La page actuelle manque de contenu. Ajouter au moins 500 mots de contenu unique décrivant les avantages, caractéristiques et cas d'usage de ${productName}.`,
+        title: `Enrichir le contenu pour "${queryTitle}"`,
+        content: `La page actuelle manque de contenu. Ajouter au moins 500 mots de contenu unique décrivant les avantages, caractéristiques et cas d'usage liés à "${queryTitle}".`,
       },
     ],
     keyword: [
       {
-        title: `Cibler "${productName} pas cher"`,
+        title: `Cibler "${queryTitle} pas cher"`,
         content: `Ce mot-clé longue traîne a un volume de ${randomInt(
           500,
           5000
         )} recherches/mois avec une difficulté faible. Créer une page dédiée ou optimiser la page existante.`,
       },
       {
-        title: `Opportunité: "meilleur ${productName}"`,
+        title: `Opportunité: "meilleur ${queryTitle}"`,
         content: `Mot-clé à fort intent d'achat. Volume: ${randomInt(
           1000,
           10000
         )}/mois. Créer un comparatif ou un guide "Top 10" pour capturer ce trafic.`,
       },
       {
-        title: `Optimiser pour "avis ${productName}"`,
+        title: `Optimiser pour "avis ${queryTitle}"`,
         content: `Intégrer des avis clients et un système de notation pour apparaître sur ces requêtes informationnelles à fort potentiel de conversion.`,
       },
     ],
     technical: [
       {
         title: `Améliorer le temps de chargement`,
-        content: `La page ${productName} charge en ${randomFloat(3, 8).toFixed(
+        content: `La page "${queryTitle}" charge en ${randomFloat(3, 8).toFixed(
           1
         )}s. Optimiser les images, activer la compression, et implémenter le lazy loading pour passer sous les 2s.`,
       },
       {
         title: `Corriger les données structurées`,
-        content: `Le schema Product est incomplet. Ajouter les propriétés: aggregateRating, offers, brand pour améliorer l'affichage dans les SERP.`,
+        content: `Le schema est incomplet. Ajouter les propriétés manquantes pour améliorer l'affichage dans les SERP pour "${queryTitle}".`,
       },
       {
         title: `Optimiser pour mobile`,
@@ -518,7 +496,7 @@ function generateAISuggestion(
           "expert-mode.fr",
           "conseils-digital.com",
           "guide-achat.net",
-        ])} accepte les articles invités. Proposer un article sur ${productName} avec lien retour.`,
+        ])} accepte les articles invités. Proposer un article sur "${queryTitle}" avec lien retour.`,
       },
       {
         title: `Récupérer les mentions non liées`,
@@ -529,7 +507,7 @@ function generateAISuggestion(
       },
       {
         title: `Stratégie de linkbaiting`,
-        content: `Créer une étude originale ou une infographie sur ${productName} pour attirer naturellement des backlinks de qualité.`,
+        content: `Créer une étude originale ou une infographie sur "${queryTitle}" pour attirer naturellement des backlinks de qualité.`,
       },
     ],
   };
@@ -549,7 +527,7 @@ async function seed() {
   await prisma.competitorPageAnalysis.deleteMany();
   await prisma.pageAnalysis.deleteMany();
   await prisma.analysisJob.deleteMany();
-  await prisma.product.deleteMany();
+  await prisma.searchQuery.deleteMany();
   await prisma.competitor.deleteMany();
   await prisma.website.deleteMany();
   await prisma.organizationMember.deleteMany();
@@ -559,7 +537,7 @@ async function seed() {
   await prisma.user.deleteMany();
   console.log("✅ Base de données nettoyée\n");
 
-  let totalProducts = 0;
+  let totalSearchQueries = 0;
   let totalCompetitors = 0;
   let totalSerpResults = 0;
   let totalPageAnalyses = 0;
@@ -614,40 +592,49 @@ async function seed() {
       },
     });
 
-    // Créer les produits
-    console.log(`  📦 Création de ${CONFIG.PRODUCTS_PER_WEBSITE} produits...`);
-    const products: { id: string; name: string; keywords: string[] }[] = [];
+    // Créer les requêtes de recherche
+    console.log(
+      `  🔍 Création de ${CONFIG.SEARCH_QUERIES_PER_WEBSITE} requêtes de recherche...`
+    );
+    const searchQueries: { id: string; title: string; query: string }[] = [];
 
-    for (let i = 0; i < CONFIG.PRODUCTS_PER_WEBSITE; i++) {
-      // Utiliser les produits prédéfinis puis générer des variations
-      const baseProduct = industry.products[i % industry.products.length];
-      const productName =
-        i < industry.products.length
-          ? baseProduct
-          : `${baseProduct} ${
-              ["Premium", "Basic", "Pro", "Lite", "Plus", "Max"][
-                Math.floor(i / industry.products.length) % 6
+    for (let i = 0; i < CONFIG.SEARCH_QUERIES_PER_WEBSITE; i++) {
+      // Utiliser les requêtes prédéfinies puis générer des variations
+      const baseQuery =
+        industry.searchQueries[i % industry.searchQueries.length];
+      const queryText =
+        i < industry.searchQueries.length
+          ? baseQuery
+          : `${baseQuery} ${
+              ["2024", "pas cher", "avis", "comparatif", "meilleur", "guide"][
+                Math.floor(i / industry.searchQueries.length) % 6
               ]
             }`;
 
-      const keywords = generateKeywords(industry.keywords, productName);
+      // Générer un titre descriptif à partir de la requête
+      const title = queryText
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
 
-      const product = await prisma.product.create({
+      // Déterminer le niveau de concurrence (requêtes courtes = HIGH, longues = LOW)
+      const competitionLevel =
+        queryText.split(" ").length <= 2 ? "HIGH" : "LOW";
+
+      const searchQuery = await prisma.searchQuery.create({
         data: {
           websiteId: website.id,
-          name: productName,
-          description: `Description complète de ${productName}. Produit de haute qualité avec les meilleures caractéristiques du marché.`,
-          keywords: keywords,
-          sourceUrl: `https://www.${industry.domain}/produits/${generateSlug(
-            productName
-          )}`,
+          title: title,
+          description: `Requête ciblant les utilisateurs recherchant "${queryText}". Intention: informationnelle/transactionnelle.`,
+          query: queryText,
+          competitionLevel: competitionLevel,
           confidence: randomFloat(0.7, 0.99),
           isActive: Math.random() > 0.1,
         },
       });
 
-      products.push({ id: product.id, name: productName, keywords });
-      totalProducts++;
+      searchQueries.push({ id: searchQuery.id, title, query: queryText });
+      totalSearchQueries++;
     }
 
     // Créer les concurrents
@@ -689,7 +676,7 @@ async function seed() {
     );
     const serpBatchSize = 500;
     let serpBatch: {
-      productId: string | null;
+      searchQueryId: string | null;
       competitorId: string | null;
       query: string;
       position: number | null;
@@ -702,17 +689,17 @@ async function seed() {
       createdAt: Date;
     }[] = [];
 
-    // Calculer le nombre de checks SERP par produit
+    // Calculer le nombre de checks SERP par requête
     const totalWeeks = Math.floor(CONFIG.SERP_HISTORY_DAYS / 7);
-    const checksPerProduct = totalWeeks * CONFIG.SERP_CHECKS_PER_WEEK;
+    const checksPerQuery = totalWeeks * CONFIG.SERP_CHECKS_PER_WEEK;
 
-    for (const product of products) {
-      // Position initiale pour ce produit (pour simuler une évolution)
+    for (const sq of searchQueries) {
+      // Position initiale pour cette requête (pour simuler une évolution)
       let basePosition = randomInt(10, 80);
 
-      for (let checkIndex = 0; checkIndex < checksPerProduct; checkIndex++) {
+      for (let checkIndex = 0; checkIndex < checksPerQuery; checkIndex++) {
         const daysAgo = Math.floor(
-          (checkIndex / checksPerProduct) * CONFIG.SERP_HISTORY_DAYS
+          (checkIndex / checksPerQuery) * CONFIG.SERP_HISTORY_DAYS
         );
         const createdAt = randomDate(
           CONFIG.SERP_HISTORY_DAYS - daysAgo,
@@ -720,7 +707,7 @@ async function seed() {
         );
 
         // Simuler une amélioration progressive du positionnement
-        const progressFactor = checkIndex / checksPerProduct;
+        const progressFactor = checkIndex / checksPerQuery;
         const positionVariation = randomInt(-5, 5);
         const trendImprovement = Math.floor(progressFactor * randomInt(5, 20));
         const position = Math.max(
@@ -728,25 +715,21 @@ async function seed() {
           Math.min(100, basePosition - trendImprovement + positionVariation)
         );
 
-        const query = generateSearchQuery(product.name, product.keywords);
         const searchEngine = randomElement(SEARCH_ENGINES);
         const device = randomElement(DEVICES);
         const country = randomElement(COUNTRIES);
 
         serpBatch.push({
-          productId: product.id,
+          searchQueryId: sq.id,
           competitorId: null,
-          query,
+          query: sq.query,
           position: Math.random() > 0.1 ? position : null, // 10% non trouvé
           url:
             position <= 10
-              ? `https://www.${industry.domain}/produits/${generateSlug(
-                  product.name
-                )}`
+              ? `https://www.${industry.domain}/${generateSlug(sq.title)}`
               : null,
-          title: position <= 10 ? generatePageTitle(product.name) : null,
-          snippet:
-            position <= 10 ? generateMetaDescription(product.name) : null,
+          title: position <= 10 ? generatePageTitle(sq.title) : null,
+          snippet: position <= 10 ? generateMetaDescription(sq.title) : null,
           searchEngine,
           country,
           device,
@@ -771,12 +754,15 @@ async function seed() {
       const competitorStrength = randomFloat(0.3, 1.2); // < 1 = plus faible, > 1 = plus fort
 
       // Suivre les positions du concurrent sur une sélection de produits/mots-clés
-      const trackedProducts = products.slice(0, Math.min(30, products.length)); // Top 30 produits suivis
+      const trackedQueries = searchQueries.slice(
+        0,
+        Math.min(30, searchQueries.length)
+      ); // Top 30 requêtes suivies
       const checksPerKeyword = Math.floor(
         (totalWeeks * CONFIG.SERP_CHECKS_PER_WEEK) / 2
       ); // ~78 checks par keyword/an
 
-      for (const product of trackedProducts) {
+      for (const sq of trackedQueries) {
         // Position de base du concurrent pour ce mot-clé
         const baseCompetitorPosition = Math.floor(
           randomInt(5, 60) / competitorStrength
@@ -805,16 +791,14 @@ async function seed() {
             )
           );
 
-          const query = generateSearchQuery(product.name, product.keywords);
-
           serpBatch.push({
-            productId: null,
+            searchQueryId: null,
             competitorId: competitor.id,
-            query,
+            query: sq.query,
             position: Math.random() > 0.05 ? position : null, // 5% non trouvé
-            url: `${competitor.url}/${generateSlug(product.name)}`,
-            title: `${product.name} - ${competitor.name}`,
-            snippet: `Découvrez ${product.name} chez ${competitor.name}. Large sélection disponible.`,
+            url: `${competitor.url}/${generateSlug(sq.title)}`,
+            title: `${sq.title} - ${competitor.name}`,
+            snippet: `Découvrez ${sq.title} chez ${competitor.name}. Large sélection disponible.`,
             searchEngine: randomElement(SEARCH_ENGINES),
             country: randomElement(COUNTRIES),
             device: randomElement(DEVICES),
@@ -845,16 +829,14 @@ async function seed() {
     const pageAnalysesBatch = [];
 
     for (let i = 0; i < CONFIG.PAGE_ANALYSES_PER_WEBSITE; i++) {
-      const product = products[i % products.length];
+      const sq = searchQueries[i % searchQueries.length];
       pageAnalysesBatch.push({
         websiteId: website.id,
-        url: `https://www.${industry.domain}/produits/${generateSlug(
-          product.name
-        )}`,
-        title: generatePageTitle(product.name),
-        metaDescription: generateMetaDescription(product.name),
-        headings: generateHeadings(product.name),
-        keywords: generateKeywordsJson(product.name, industry.keywords),
+        url: `https://www.${industry.domain}/${generateSlug(sq.title)}`,
+        title: generatePageTitle(sq.title),
+        metaDescription: generateMetaDescription(sq.title),
+        headings: generateHeadings(sq.title),
+        keywords: generateKeywordsJson(sq.title, industry.keywords),
         wordCount: randomInt(500, 3000),
         createdAt: randomDate(CONFIG.SERP_HISTORY_DAYS, 0),
       });
@@ -869,14 +851,14 @@ async function seed() {
 
     for (const competitor of competitors) {
       for (let i = 0; i < CONFIG.COMPETITOR_PAGE_ANALYSES_PER_COMPETITOR; i++) {
-        const product = randomElement(products);
+        const sq = randomElement(searchQueries);
         competitorPagesBatch.push({
           competitorId: competitor.id,
-          url: `${competitor.url}/${generateSlug(product.name)}`,
-          title: `${product.name} | ${competitor.name}`,
-          metaDescription: `${product.name} disponible chez ${competitor.name}. Livraison rapide et prix bas.`,
-          headings: generateHeadings(product.name),
-          keywords: generateKeywordsJson(product.name, industry.keywords),
+          url: `${competitor.url}/${generateSlug(sq.title)}`,
+          title: `${sq.title} | ${competitor.name}`,
+          metaDescription: `${sq.title} disponible chez ${competitor.name}. Livraison rapide et prix bas.`,
+          headings: generateHeadings(sq.title),
+          keywords: generateKeywordsJson(sq.title, industry.keywords),
           wordCount: randomInt(400, 2500),
           createdAt: randomDate(CONFIG.SERP_HISTORY_DAYS, 0),
         });
@@ -922,13 +904,13 @@ async function seed() {
     console.log(`  💡 Création des suggestions IA...`);
     const suggestionsBatch = [];
 
-    for (const product of products) {
-      for (let i = 0; i < CONFIG.SUGGESTIONS_PER_PRODUCT; i++) {
+    for (const sq of searchQueries) {
+      for (let i = 0; i < CONFIG.SUGGESTIONS_PER_QUERY; i++) {
         const type = randomElement(SUGGESTION_TYPES);
-        const suggestion = generateAISuggestion(type, product.name);
+        const suggestion = generateAISuggestion(type, sq.title);
 
         suggestionsBatch.push({
-          productId: product.id,
+          searchQueryId: sq.id,
           type,
           title: suggestion.title,
           content: suggestion.content,
@@ -954,7 +936,7 @@ async function seed() {
     `  👥 Utilisateurs:            ${INDUSTRIES.length * CONFIG.USERS_PER_ORG}`
   );
   console.log(`  🌐 Websites:                ${INDUSTRIES.length}`);
-  console.log(`  📦 Produits/Services:       ${totalProducts}`);
+  console.log(`  🔍 Requêtes de recherche:   ${totalSearchQueries}`);
   console.log(`  🏢 Concurrents:             ${totalCompetitors}`);
   console.log(
     `  📊 Résultats SERP:          ${totalSerpResults.toLocaleString()}`

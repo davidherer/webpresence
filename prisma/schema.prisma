@@ -160,11 +160,11 @@ model Website {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  products     Product[]
-  competitors  Competitor[]
-  pageAnalyses PageAnalysis[]
-  aiReports    AIReport[]
-  analysisJobs AnalysisJob[]
+  searchQueries SearchQuery[]
+  competitors   Competitor[]
+  pageAnalyses  PageAnalysis[]
+  aiReports     AIReport[]
+  analysisJobs  AnalysisJob[]
 
   @@unique([organizationId, url])
   @@index([organizationId])
@@ -172,20 +172,25 @@ model Website {
 }
 
 // ==========================================
-// PRODUCTS & SERVICES (Identified by AI)
+// SEARCH QUERIES (Identified by AI)
 // ==========================================
 
-model Product {
-  id          String   @id @default(cuid())
-  websiteId   String
-  name        String
-  description String?
-  keywords    String[] // Main keywords associated with this product/service
-  sourceUrl   String?  // URL where this product was identified
-  confidence  Float    @default(0) // AI confidence score 0-1
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+enum CompetitionLevel {
+  HIGH
+  LOW
+}
+
+model SearchQuery {
+  id               String           @id @default(cuid())
+  websiteId        String
+  title            String           // Display name for this search query
+  description      String?          // Search intent description, target audience
+  query            String           // The actual search query (keywords for SERP)
+  competitionLevel CompetitionLevel @default(HIGH) // HIGH = competitive, LOW = long-tail
+  confidence       Float            @default(0) // AI confidence score 0-1
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
@@ -194,6 +199,7 @@ model Product {
 
   @@index([websiteId])
   @@index([isActive])
+  @@index([query])
 }
 
 // ==========================================
@@ -225,26 +231,26 @@ model Competitor {
 // ==========================================
 
 model SerpResult {
-  id           String   @id @default(cuid())
-  productId    String?
-  competitorId String?
-  query        String   // Search query used
-  position     Int?     // Position in SERP (null if not found)
-  url          String?  // URL that appeared in SERP
-  title        String?
-  snippet      String?
-  searchEngine String   @default("google")
-  country      String   @default("FR")
-  device       String   @default("desktop") // desktop, mobile
-  createdAt    DateTime @default(now())
+  id            String   @id @default(cuid())
+  searchQueryId String?
+  competitorId  String?
+  query         String   // Search query used
+  position      Int?     // Position in SERP (null if not found)
+  url           String?  // URL that appeared in SERP
+  title         String?
+  snippet       String?
+  searchEngine  String   @default("google")
+  country       String   @default("FR")
+  device        String   @default("desktop") // desktop, mobile
+  createdAt     DateTime @default(now())
 
   // Raw SERP data stored in Vercel Blob
   rawDataBlobUrl String?
 
-  product    Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
-  competitor Competitor? @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  searchQuery SearchQuery? @relation(fields: [searchQueryId], references: [id], onDelete: Cascade)
+  competitor  Competitor?  @relation(fields: [competitorId], references: [id], onDelete: Cascade)
 
-  @@index([productId])
+  @@index([searchQueryId])
   @@index([competitorId])
   @@index([query])
   @@index([createdAt])
@@ -316,19 +322,19 @@ model AIReport {
 }
 
 model AISuggestion {
-  id        String   @id @default(cuid())
-  productId String
-  type      String   // content, keyword, technical, backlink
-  title     String
-  content   String   @db.Text
-  priority  Int      @default(0) // Higher = more important
-  status    String   @default("pending") // pending, accepted, dismissed
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  searchQueryId String
+  type          String   // content, keyword, technical, backlink
+  title         String
+  content       String   @db.Text
+  priority      Int      @default(0) // Higher = more important
+  status        String   @default("pending") // pending, accepted, dismissed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  searchQuery SearchQuery @relation(fields: [searchQueryId], references: [id], onDelete: Cascade)
 
-  @@index([productId])
+  @@index([searchQueryId])
   @@index([type])
   @@index([status])
   @@index([priority])

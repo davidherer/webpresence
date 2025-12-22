@@ -31,10 +31,11 @@ interface SerpResult {
   createdAt: Date;
 }
 
-interface Product {
+interface SearchQuery {
   id: string;
-  name: string;
-  keywords: string[];
+  title: string;
+  query: string;
+  competitionLevel: "HIGH" | "LOW";
   serpResults: SerpResult[];
   _count: {
     aiSuggestions: number;
@@ -60,7 +61,7 @@ interface Website {
   name: string;
   url: string;
   status: string;
-  products: Product[];
+  searchQueries: SearchQuery[];
   competitors: Competitor[];
   aiReports: AIReport[];
 }
@@ -69,7 +70,7 @@ interface WebsiteData {
   website: Website;
 }
 
-// Get trend for a product (comparing last 2 SERP results)
+// Get trend for a search query (comparing last 2 SERP results)
 const getTrend = (serpResults: { position: number | null }[]) => {
   if (serpResults.length < 2) return null;
   const current = serpResults[0]?.position;
@@ -183,7 +184,7 @@ export default function WebsitePage({ params }: PageProps) {
             <div>
               <p className="font-medium">Analyse en cours</p>
               <p className="text-sm text-muted-foreground">
-                Nous analysons votre site pour identifier vos produits et services. Cela peut prendre quelques minutes.
+                Nous analysons votre site pour identifier les requêtes de recherche pertinentes. Cela peut prendre quelques minutes.
               </p>
             </div>
           </CardContent>
@@ -194,8 +195,8 @@ export default function WebsitePage({ params }: PageProps) {
       <div className="grid gap-4 md:grid-cols-4 mb-8">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Produits/Services</CardDescription>
-            <CardTitle className="text-3xl">{website.products.length}</CardTitle>
+            <CardDescription>Requêtes de recherche</CardDescription>
+            <CardTitle className="text-3xl">{website.searchQueries.length}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -214,56 +215,55 @@ export default function WebsitePage({ params }: PageProps) {
           <CardHeader className="pb-2">
             <CardDescription>Suggestions en attente</CardDescription>
             <CardTitle className="text-3xl">
-              {website.products.reduce((acc, p) => acc + p._count.aiSuggestions, 0)}
+              {website.searchQueries.reduce((acc, q) => acc + q._count.aiSuggestions, 0)}
             </CardTitle>
           </CardHeader>
         </Card>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">
-        {/* Products section */}
+        {/* Search Queries section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold flex items-center gap-2">
               <BarChart3 className="w-5 h-5" />
-              Produits & Services
+              Requêtes de recherche
             </h2>
-            <Link href={`/dashboard/o/${slug}/w/${websiteId}/products`}>
+            <Link href={`/dashboard/o/${slug}/w/${websiteId}/queries`}>
               <Button variant="ghost" size="sm">Voir tout</Button>
             </Link>
           </div>
 
-          {website.products.length === 0 ? (
+          {website.searchQueries.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-8 text-center text-muted-foreground">
                 {website.status === "active"
-                  ? "Aucun produit identifié. Relancez l'analyse ou ajoutez-en manuellement."
-                  : "Les produits seront identifiés automatiquement après l'analyse."}
+                  ? "Aucune requête identifiée. Relancez l'analyse ou ajoutez-en manuellement."
+                  : "Les requêtes seront identifiées automatiquement après l'analyse."}
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-3">
-              {website.products.slice(0, 5).map((product) => {
-                const latestPosition = product.serpResults[0]?.position;
-                const trend = getTrend(product.serpResults);
+              {website.searchQueries.slice(0, 5).map((searchQuery) => {
+                const latestPosition = searchQuery.serpResults[0]?.position;
+                const trend = getTrend(searchQuery.serpResults);
 
                 return (
-                  <Link key={product.id} href={`/dashboard/o/${slug}/w/${websiteId}/products/${product.id}`}>
+                  <Link key={searchQuery.id} href={`/dashboard/o/${slug}/w/${websiteId}/queries/${searchQuery.id}`}>
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium">{product.name}</p>
+                            <p className="font-medium">{searchQuery.title}</p>
                             <p className="text-sm text-muted-foreground">
-                              {product.keywords.slice(0, 3).join(", ")}
-                              {product.keywords.length > 3 && ` +${product.keywords.length - 3}`}
+                              {searchQuery.query}
                             </p>
                           </div>
                           <div className="flex items-center gap-4">
-                            {product._count.aiSuggestions > 0 && (
+                            {searchQuery._count.aiSuggestions > 0 && (
                               <div className="flex items-center gap-1 text-amber-500">
                                 <Lightbulb className="w-4 h-4" />
-                                <span className="text-sm">{product._count.aiSuggestions}</span>
+                                <span className="text-sm">{searchQuery._count.aiSuggestions}</span>
                               </div>
                             )}
                             <div className="flex items-center gap-2">
@@ -271,7 +271,7 @@ export default function WebsitePage({ params }: PageProps) {
                               <span className="text-lg font-semibold">
                                 {latestPosition !== null && latestPosition !== undefined && latestPosition > 0
                                   ? `#${latestPosition}`
-                                  : product.serpResults.length > 0
+                                  : searchQuery.serpResults.length > 0
                                     ? <span className="text-orange-500">Absent</span>
                                     : "-"}
                               </span>

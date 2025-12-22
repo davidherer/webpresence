@@ -25,7 +25,7 @@ interface Website {
   url: string;
   status: string;
   _count: {
-    products: number;
+    searchQueries: number;
     competitors: number;
     aiReports: number;
   };
@@ -171,9 +171,9 @@ export default function OrganizationPage({ params }: PageProps) {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Produits/Services suivis</CardDescription>
+            <CardDescription>Requêtes de recherche</CardDescription>
             <CardTitle className="text-3xl">
-              {websites.reduce((acc, w) => acc + w._count.products, 0)}
+              {websites.reduce((acc, w) => acc + w._count.searchQueries, 0)}
             </CardTitle>
           </CardHeader>
         </Card>
@@ -236,7 +236,7 @@ export default function OrganizationPage({ params }: PageProps) {
                     <div className="flex gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <BarChart3 className="w-4 h-4" />
-                        {website._count.products} produit{website._count.products !== 1 ? "s" : ""}
+                        {website._count.searchQueries} requête{website._count.searchQueries !== 1 ? "s" : ""}
                       </div>
                       <div>
                         {website._count.competitors} concurrent{website._count.competitors !== 1 ? "s" : ""}

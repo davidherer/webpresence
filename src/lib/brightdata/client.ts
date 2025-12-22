@@ -233,7 +233,7 @@ class BrightDataClient {
               url,
               domain,
               title: item.title || "",
-              description: item.description || "",
+              snippet: item.description || "",
             });
           }
         } else {

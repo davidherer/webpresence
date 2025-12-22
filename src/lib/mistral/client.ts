@@ -18,9 +18,9 @@ interface PageContent {
 }
 
 /**
- * Analyze pages to identify products and services
+ * Analyze pages to identify search queries (products, services, themes, entities)
  */
-export async function identifyProductsAndServices(
+export async function identifySearchQueries(
   websiteName: string,
   websiteUrl: string,
   pages: PageContent[]
@@ -43,31 +43,32 @@ Top Keywords: ${
     )
     .join("\n---\n");
 
-  const prompt = `Tu es un expert en analyse de sites web et en SEO. Analyse les pages suivantes du site "${websiteName}" (${websiteUrl}) et identifie les produits et services proposés.
+  const prompt = `Tu es un expert en analyse de sites web et en SEO. Analyse les pages suivantes du site "${websiteName}" (${websiteUrl}) et identifie les requêtes de recherche pertinentes.
 
 PAGES ANALYSÉES:
 ${pagesContext}
 
 INSTRUCTIONS:
-1. Identifie tous les produits et services distincts proposés par ce site
-2. Pour chaque produit/service, détermine:
-   - Un nom clair et concis
-   - Une description en 1-2 phrases
-   - Les mots-clés principaux associés (5-10 mots-clés pertinents pour le SEO)
-   - L'URL source où ce produit/service a été identifié
-   - Un score de confiance (0-1) basé sur la clarté de l'information
+1. Identifie les produits, services, thèmes, lieux ou entités que des utilisateurs seraient susceptibles de rechercher
+2. Pour chaque élément identifié, génère UNE requête de recherche (query) qui sera utilisée pour le suivi SERP
+3. Pour chaque requête, détermine:
+   - Un titre clair et descriptif
+   - Une description de l'intention de recherche et de l'audience visée
+   - La requête exacte (1 à 5 mots-clés) pour le SERP
+   - Le niveau de concurrence: "HIGH" (requête générique, forte concurrence) ou "LOW" (longue traîne, faible concurrence)
+   - Un score de confiance (0-1) basé sur la pertinence de la requête pour ce site
 
-3. Fournis un résumé général du positionnement du site
-4. Donne 3-5 recommandations initiales pour améliorer la visibilité
+4. Fournis un résumé général du positionnement du site
+5. Donne 3-5 recommandations initiales pour améliorer la visibilité
 
 RÉPONDS UNIQUEMENT EN JSON avec cette structure exacte:
 {
-  "products": [
+  "searchQueries": [
     {
-      "name": "Nom du produit/service",
-      "description": "Description courte",
-      "keywords": ["mot-clé1", "mot-clé2"],
-      "sourceUrl": "https://...",
+      "title": "Titre descriptif de la requête",
+      "description": "Description de l'intention de recherche et audience visée",
+      "query": "mots clés recherche",
+      "competitionLevel": "HIGH",
       "confidence": 0.85
     }
   ],
@@ -75,12 +76,14 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure exacte:
   "recommendations": ["Recommandation 1", "Recommandation 2"]
 }`;
 
+  console.log("[Mistral] Calling AI to identify search queries...");
   const response = await client.chat.complete({
     model: MODEL_LARGE,
     messages: [{ role: "user", content: prompt }],
     responseFormat: { type: "json_object" },
     temperature: 0.3,
   });
+  console.log("[Mistral] ✓ AI response received");
 
   const content = response.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -134,12 +137,14 @@ RÉPONDS EN JSON:
   "highlights": ["Point clé 1", "Point clé 2", "Point clé 3"]
 }`;
 
+  console.log(`[Mistral] Generating periodic recap for ${periodDays} days...`);
   const response = await client.chat.complete({
     model: MODEL_LARGE,
     messages: [{ role: "user", content: prompt }],
     responseFormat: { type: "json_object" },
     temperature: 0.4,
   });
+  console.log("[Mistral] ✓ Recap generated");
 
   const content = response.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -150,11 +155,11 @@ RÉPONDS EN JSON:
 }
 
 /**
- * Generate SEO improvement suggestions for a product/service
+ * Generate SEO improvement suggestions for a search query
  */
 export async function generateSEOSuggestions(
-  productName: string,
-  productKeywords: string[],
+  searchQueryTitle: string,
+  searchQuery: string,
   currentPage: PageContent,
   serpResults: Array<{
     position: number;
@@ -171,12 +176,12 @@ export async function generateSEOSuggestions(
     priority: number;
   }>
 > {
-  const prompt = `Tu es un expert SEO. Analyse les données suivantes et propose des améliorations pour augmenter la visibilité du produit/service "${productName}".
+  const prompt = `Tu es un expert SEO. Analyse les données suivantes et propose des améliorations pour augmenter la visibilité pour la requête "${searchQueryTitle}" (${searchQuery}).
 
 PAGE ACTUELLE:
 ${JSON.stringify(currentPage, null, 2)}
 
-MOTS-CLÉS CIBLÉS: ${productKeywords.join(", ")}
+REQUÊTE CIBLÉE: ${searchQuery}
 
 RÉSULTATS SERP ACTUELS:
 ${JSON.stringify(serpResults.slice(0, 10), null, 2)}
@@ -208,12 +213,16 @@ RÉPONDS EN JSON:
   ]
 }`;
 
+  console.log(
+    `[Mistral] Generating SEO suggestions for "${searchQueryTitle}"...`
+  );
   const response = await client.chat.complete({
     model: MODEL_LARGE,
     messages: [{ role: "user", content: prompt }],
     responseFormat: { type: "json_object" },
     temperature: 0.5,
   });
+  console.log("[Mistral] ✓ SEO suggestions generated");
 
   const content = response.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -263,12 +272,14 @@ RÉPONDS EN JSON:
   "summary": "Résumé de l'analyse en 2-3 phrases"
 }`;
 
+  console.log(`[Mistral] Analyzing competitor "${competitorName}"...`);
   const response = await client.chat.complete({
     model: MODEL_LARGE,
     messages: [{ role: "user", content: prompt }],
     responseFormat: { type: "json_object" },
     temperature: 0.4,
   });
+  console.log("[Mistral] ✓ Competitor analysis completed");
 
   const content = response.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -316,7 +327,7 @@ RÉPONDS EN JSON:
 }
 
 export const mistral = {
-  identifyProductsAndServices,
+  identifySearchQueries,
   generatePeriodicRecap,
   generateSEOSuggestions,
   analyzeCompetitor,

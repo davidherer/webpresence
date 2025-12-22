@@ -26,7 +26,7 @@ import {
 interface MetaComparisonBlockProps {
   orgSlug: string;
   websiteId: string;
-  productId: string;
+  queryId: string;
 }
 
 interface KeywordItem {
@@ -118,7 +118,7 @@ interface ComparisonData {
 export function MetaComparisonBlock({
   orgSlug,
   websiteId,
-  productId,
+  queryId,
 }: MetaComparisonBlockProps) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ComparisonData | null>(null);
@@ -134,7 +134,7 @@ export function MetaComparisonBlock({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/meta-comparison`
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/meta-comparison`
       );
       const json = await res.json();
 
@@ -146,7 +146,7 @@ export function MetaComparisonBlock({
     } finally {
       setLoading(false);
     }
-  }, [orgSlug, websiteId, productId]);
+  }, [orgSlug, websiteId, queryId]);
 
   useEffect(() => {
     fetchData();

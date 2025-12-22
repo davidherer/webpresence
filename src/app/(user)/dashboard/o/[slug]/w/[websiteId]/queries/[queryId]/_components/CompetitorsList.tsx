@@ -18,7 +18,7 @@ import {
 interface CompetitorsListProps {
   orgSlug: string;
   websiteId: string;
-  productId: string;
+  queryId: string;
 }
 
 interface Competitor {
@@ -44,11 +44,11 @@ interface Summary {
   highThreat: number;
   mediumThreat: number;
   lowThreat: number;
-  ourKeywords: string[];
+  searchQuery: string;
   searchedQueries: string[];
 }
 
-export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsListProps) {
+export function CompetitorsList({ orgSlug, websiteId, queryId }: CompetitorsListProps) {
   const [loading, setLoading] = useState(true);
   const [reanalyzing, setReanalyzing] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -60,7 +60,7 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/competitors`
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/competitors`
       );
       const json = await res.json();
 
@@ -79,7 +79,7 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
     setReanalyzing(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/serp/reanalyze`,
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/serp/reanalyze`,
         { method: "POST" }
       );
       const json = await res.json();
@@ -119,26 +119,8 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
   };
 
   useEffect(() => {
-    const doFetch = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/competitors`
-        );
-        const json = await res.json();
-
-        if (json.success) {
-          setCompetitors(json.data.competitors);
-          setSummary(json.data.summary);
-        }
-      } catch (error) {
-        console.error("Failed to fetch competitors:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    doFetch();
-  }, [orgSlug, websiteId, productId]);
+    fetchData();
+  }, [orgSlug, websiteId, queryId]);
 
   const getThreatIcon = (threat: string) => {
     switch (threat) {
@@ -179,7 +161,7 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
           <div>
             <CardTitle>Concurrents identifiés</CardTitle>
             <CardDescription>
-              Concurrents présents sur les mêmes mots-clés que ce produit
+              Concurrents présents sur cette requête de recherche
             </CardDescription>
           </div>
           <div className="flex gap-2">
@@ -274,7 +256,7 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
                     <div className="text-right flex items-center gap-3">
                       <div>
                         <p className="text-sm font-medium">
-                          {competitor.sharedKeywords} mot(s)-clé(s) en commun
+                          {competitor.sharedKeywords} requête(s) en commun
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {getThreatLabel(competitor.threat)}
@@ -301,7 +283,7 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
                 {expandedCompetitor === competitor.id && (
                   <div className="px-4 pb-4 border-t bg-muted/30">
                     <h5 className="text-sm font-medium mt-4 mb-3">
-                      Comparaison par mot-clé
+                      Comparaison des positions
                     </h5>
                     {competitor.comparison.length > 0 ? (
                       <div className="space-y-2">

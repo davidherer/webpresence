@@ -4,19 +4,19 @@ import { withUserAuth } from "@/lib/api/middleware";
 import { mistral } from "@/lib/mistral";
 
 interface RouteContext {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
 interface AuthRequest extends Request {
   user: { id: string; email: string };
 }
 
-// Helper to check product access
-async function checkProductAccess(
+// Helper to check search query access
+async function checkSearchQueryAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string
+  queryId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
     where: {
@@ -29,9 +29,9 @@ async function checkProductAccess(
     return null;
   }
 
-  const product = await prisma.product.findFirst({
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       websiteId,
       website: { organizationId: membership.organizationId },
     },
@@ -50,21 +50,26 @@ async function checkProductAccess(
     },
   });
 
-  return product;
+  return searchQuery;
 }
 
 /**
- * GET /api/organizations/:slug/websites/:websiteId/products/:productId/suggestions
- * Get AI suggestions for a product
+ * GET /api/organizations/:slug/websites/:websiteId/queries/:queryId/suggestions
+ * Get AI suggestions for a search query
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
@@ -76,7 +81,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   const suggestions = await prisma.aISuggestion.findMany({
     where: {
-      productId,
+      searchQueryId: queryId,
       ...(status ? { status } : {}),
       ...(type ? { type } : {}),
     },
@@ -113,23 +118,28 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 });
 
 /**
- * POST /api/organizations/:slug/websites/:websiteId/products/:productId/suggestions
- * Generate new AI suggestions for a product
+ * POST /api/organizations/:slug/websites/:websiteId/queries/:queryId/suggestions
+ * Generate new AI suggestions for a search query
  */
 export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
   // Get our page content
-  const pageContents = product.website.pageAnalyses.map((p) => ({
+  const pageContents = searchQuery.website.pageAnalyses.map((p) => ({
     url: p.url,
     title: p.title,
     metaDescription: p.metaDescription,
@@ -140,7 +150,7 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   }));
 
   // Get competitor pages for comparison
-  const competitorPages = product.website.competitors.flatMap((c) =>
+  const competitorPages = searchQuery.website.competitors.flatMap((c) =>
     c.pageAnalyses.map((p) => ({
       url: p.url,
       title: p.title || "",
@@ -152,28 +162,28 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   );
 
   // Get SERP performance
-  const serpPerformance = product.serpResults
+  const serpPerformance = searchQuery.serpResults
     .filter((r) => r.position !== null)
     .map((r) => ({
       position: r.position!,
-      url: product.sourceUrl || product.website.url,
-      title: r.title || product.name,
+      url: searchQuery.website.url,
+      title: r.title || searchQuery.title,
       snippet: r.snippet || "",
     }));
 
-  // Build current page content (use first analysis or create from product)
+  // Build current page content (use first analysis or create from search query)
   const currentPage = pageContents[0] || {
-    url: product.sourceUrl || product.website.url,
-    title: product.name,
-    metaDescription: product.description || "",
-    headings: { h1: [product.name], h2: [], h3: [] },
-    keywords: product.keywords.map((k) => ({ keyword: k, frequency: 1 })),
+    url: searchQuery.website.url,
+    title: searchQuery.title,
+    metaDescription: searchQuery.description || "",
+    headings: { h1: [searchQuery.title], h2: [], h3: [] },
+    keywords: [{ keyword: searchQuery.query, frequency: 1 }],
   };
 
   // Generate suggestions using AI
   const aiSuggestions = await mistral.generateSEOSuggestions(
-    product.name,
-    product.keywords,
+    searchQuery.title,
+    searchQuery.query, // Single query string
     currentPage,
     serpPerformance,
     competitorPages
@@ -184,7 +194,7 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   for (const suggestion of aiSuggestions) {
     const created = await prisma.aISuggestion.create({
       data: {
-        productId,
+        searchQueryId: queryId,
         type: suggestion.type,
         title: suggestion.title,
         content: suggestion.content,

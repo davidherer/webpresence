@@ -4,7 +4,8 @@ export type {
   Organization,
   OrganizationMember,
   Website,
-  Product,
+  SearchQuery,
+  CompetitionLevel,
   Competitor,
   SerpResult,
   PageAnalysis,
@@ -77,16 +78,16 @@ export interface SitemapEntry {
 // AI ANALYSIS TYPES
 // ==========================================
 
-export interface IdentifiedProduct {
-  name: string;
+export interface IdentifiedSearchQuery {
+  title: string;
   description: string;
-  keywords: string[];
-  sourceUrl: string;
+  query: string;
+  competitionLevel: "HIGH" | "LOW";
   confidence: number;
 }
 
 export interface AIAnalysisResult {
-  products: IdentifiedProduct[];
+  searchQueries: IdentifiedSearchQuery[];
   summary: string;
   recommendations: string[];
 }
@@ -117,7 +118,7 @@ export interface JobPayload {
   urls?: string[];
   query?: string;
   queries?: string[];
-  productId?: string;
+  searchQueryId?: string;
   competitorId?: string;
   reportType?: AIReportType;
 }

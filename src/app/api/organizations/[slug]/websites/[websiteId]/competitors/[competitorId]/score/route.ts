@@ -43,8 +43,8 @@ async function checkWebsiteAccess(
 /**
  * GET /api/organizations/:slug/websites/:websiteId/competitors/:competitorId/score
  * Get the SERP comparison score for a competitor
- * 
- * Compares our positions (from SerpResult with productId) with competitor positions
+ *
+ * Compares our positions (from SerpResult with searchQueryId) with competitor positions
  * (from SerpResult with competitorId) on the same queries.
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
@@ -73,11 +73,11 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     );
   }
 
-  // Get our latest SERP positions (from products) - group by query to get latest
+  // Get our latest SERP positions (from search queries) - group by query to get latest
   const ourResults = await prisma.serpResult.findMany({
     where: {
-      product: { websiteId, isActive: true },
-      productId: { not: null },
+      searchQuery: { websiteId, isActive: true },
+      searchQueryId: { not: null },
     },
     orderBy: { createdAt: "desc" },
     select: {
@@ -124,14 +124,18 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   let total = 0;
 
   // Get all unique queries from both sets
-  const allQueries = new Set([...ourPositions.keys(), ...theirPositions.keys()]);
+  const allQueries = new Set([
+    ...ourPositions.keys(),
+    ...theirPositions.keys(),
+  ]);
 
   for (const query of allQueries) {
     const ourPos = ourPositions.get(query);
     const theirPos = theirPositions.get(query);
 
     const weArePresent = ourPos !== null && ourPos !== undefined && ourPos > 0;
-    const theyArePresent = theirPos !== null && theirPos !== undefined && theirPos > 0;
+    const theyArePresent =
+      theirPos !== null && theirPos !== undefined && theirPos > 0;
 
     // Only count if at least one is present
     if (weArePresent || theyArePresent) {

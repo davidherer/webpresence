@@ -6,7 +6,7 @@ interface RouteContext {
   params: Promise<{
     slug: string;
     websiteId: string;
-    productId: string;
+    queryId: string;
     suggestionId: string;
   }>;
 }
@@ -20,7 +20,7 @@ async function checkSuggestionAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string,
+  queryId: string,
   suggestionId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
@@ -37,31 +37,31 @@ async function checkSuggestionAccess(
   const suggestion = await prisma.aISuggestion.findFirst({
     where: {
       id: suggestionId,
-      productId,
-      product: {
+      searchQueryId: queryId,
+      searchQuery: {
         websiteId,
         website: { organizationId: membership.organizationId },
       },
     },
-    include: { product: true },
+    include: { searchQuery: true },
   });
 
   return suggestion;
 }
 
 /**
- * GET /api/organizations/:slug/websites/:websiteId/products/:productId/suggestions/:suggestionId
+ * GET /api/organizations/:slug/websites/:websiteId/queries/:queryId/suggestions/:suggestionId
  * Get a specific suggestion
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId, suggestionId } = await params;
+  const { slug, websiteId, queryId, suggestionId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
   const suggestion = await checkSuggestionAccess(
     user.id,
     slug,
     websiteId,
-    productId,
+    queryId,
     suggestionId
   );
 
@@ -79,18 +79,18 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 });
 
 /**
- * PATCH /api/organizations/:slug/websites/:websiteId/products/:productId/suggestions/:suggestionId
+ * PATCH /api/organizations/:slug/websites/:websiteId/queries/:queryId/suggestions/:suggestionId
  * Update suggestion status (accept/dismiss)
  */
 export const PATCH = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId, suggestionId } = await params;
+  const { slug, websiteId, queryId, suggestionId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
   const suggestion = await checkSuggestionAccess(
     user.id,
     slug,
     websiteId,
-    productId,
+    queryId,
     suggestionId
   );
 
@@ -126,18 +126,18 @@ export const PATCH = withUserAuth<RouteContext>(async (req, { params }) => {
 });
 
 /**
- * DELETE /api/organizations/:slug/websites/:websiteId/products/:productId/suggestions/:suggestionId
+ * DELETE /api/organizations/:slug/websites/:websiteId/queries/:queryId/suggestions/:suggestionId
  * Delete a suggestion
  */
 export const DELETE = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId, suggestionId } = await params;
+  const { slug, websiteId, queryId, suggestionId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
   const suggestion = await checkSuggestionAccess(
     user.id,
     slug,
     websiteId,
-    productId,
+    queryId,
     suggestionId
   );
 

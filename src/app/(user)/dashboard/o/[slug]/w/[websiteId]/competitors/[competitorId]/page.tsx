@@ -22,46 +22,46 @@ interface PageProps {
 
 interface SerpComparison {
   query: string;
-  productName: string;
-  productId: string;
+  queryTitle: string;
+  queryId: string;
   ourPosition: number;
   theirPosition: number;
   weAreBetter: boolean;
 }
 
 /**
- * Get SERP comparisons between our products and a competitor.
+ * Get SERP comparisons between our search queries and a competitor.
  * Uses SerpResult data directly from the database (not from blob storage).
  */
 async function getCompetitorSerpComparisons(
   competitorId: string,
   websiteId: string
 ): Promise<SerpComparison[]> {
-  // Get our latest SERP results for each product
-  const products = await prisma.product.findMany({
+  // Get our latest SERP results for each search query
+  const searchQueries = await prisma.searchQuery.findMany({
     where: { websiteId, isActive: true },
     select: {
       id: true,
-      name: true,
+      title: true,
       serpResults: {
         orderBy: { createdAt: "desc" },
-        take: 50, // Get more results to have multiple queries per product
+        take: 50, // Get more results to have multiple queries per search query
         select: { query: true, position: true, createdAt: true },
       },
     },
   });
 
-  // Build a map of our positions: query -> { position, productName, productId }
-  const ourPositions = new Map<string, { position: number | null; productName: string; productId: string }>();
-  for (const product of products) {
-    for (const result of product.serpResults) {
+  // Build a map of our positions: query -> { position, queryTitle, queryId }
+  const ourPositions = new Map<string, { position: number | null; queryTitle: string; queryId: string }>();
+  for (const searchQuery of searchQueries) {
+    for (const result of searchQuery.serpResults) {
       const queryLower = result.query.toLowerCase();
       // Keep the first (most recent) result for each query
       if (!ourPositions.has(queryLower)) {
         ourPositions.set(queryLower, {
           position: result.position,
-          productName: product.name,
-          productId: product.id,
+          queryTitle: searchQuery.title,
+          queryId: searchQuery.id,
         });
       }
     }
@@ -111,8 +111,8 @@ async function getCompetitorSerpComparisons(
 
       comparisons.push({
         query: query,
-        productName: ourData.productName,
-        productId: ourData.productId,
+        queryTitle: ourData.queryTitle,
+        queryId: ourData.queryId,
         ourPosition: ourPos ?? 0,
         theirPosition: theirPos ?? 0,
         weAreBetter,
@@ -303,10 +303,10 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
                     </div>
                     <div className="col-span-3">
                       <Link
-                        href={`/dashboard/o/${slug}/w/${websiteId}/products/${comparison.productId}`}
+                        href={`/dashboard/o/${slug}/w/${websiteId}/queries/${comparison.queryId}`}
                         className="text-sm text-blue-600 hover:underline truncate block"
                       >
-                        {comparison.productName}
+                        {comparison.queryTitle}
                       </Link>
                     </div>
                     <div className={`col-span-1 text-center font-bold ${comparison.ourPosition === 0 ? 'text-orange-500' : ''}`}>

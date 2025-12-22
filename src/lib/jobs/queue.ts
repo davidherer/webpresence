@@ -61,24 +61,24 @@ async function processJob(
 
     case "serp_analysis":
       console.log(
-        `[JobQueue processJob] SERP analysis - productId: ${
-          payload.productId
-        }, queries count: ${payload.queries?.length || 0}`
+        `[JobQueue processJob] SERP analysis - searchQueryId: ${
+          payload.searchQueryId
+        }, query: ${payload.query || "N/A"}`
       );
-      if (payload.productId && payload.queries) {
+      if (payload.searchQueryId && payload.query) {
         console.log(`[JobQueue processJob] Calling serp.runSerpAnalysis...`);
         const serpResult = await serp.runSerpAnalysis(
           websiteId,
-          payload.productId,
-          payload.queries as string[]
+          payload.searchQueryId,
+          [payload.query] // Single query per search query
         );
         console.log(`[JobQueue processJob] SERP analysis completed`);
         return { success: true, data: serpResult };
       }
       console.log(
-        `[JobQueue processJob] SERP analysis failed - missing productId or queries`
+        `[JobQueue processJob] SERP analysis failed - missing searchQueryId or query`
       );
-      return { success: false, error: "Missing productId or queries" };
+      return { success: false, error: "Missing searchQueryId or query" };
 
     case "ai_report":
       console.log(
@@ -89,7 +89,7 @@ async function processJob(
         const website = await prisma.website.findUnique({
           where: { id: websiteId },
           include: {
-            products: { where: { isActive: true } },
+            searchQueries: { where: { isActive: true } },
             competitors: { where: { isActive: true } },
           },
         });
@@ -107,17 +107,20 @@ async function processJob(
           const periodDays = 30; // Default to 30 days
           const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
 
-          const productsData = await Promise.all(
-            website.products.map(async (product) => {
+          const searchQueriesData = await Promise.all(
+            website.searchQueries.map(async (searchQuery) => {
               const currentResults = await prisma.serpResult.findMany({
-                where: { productId: product.id, createdAt: { gte: since } },
+                where: {
+                  searchQueryId: searchQuery.id,
+                  createdAt: { gte: since },
+                },
                 orderBy: { createdAt: "desc" },
                 take: 10,
               });
 
               return {
-                name: product.name,
-                keywords: product.keywords,
+                name: searchQuery.title,
+                keywords: [searchQuery.query],
                 currentPositions: currentResults.map((r) => ({
                   query: r.query,
                   position: r.position,
@@ -154,7 +157,7 @@ async function processJob(
           );
           const report = await mistral.generatePeriodicRecap(
             website.name,
-            productsData,
+            searchQueriesData,
             competitorsData,
             periodDays
           );
@@ -341,9 +344,9 @@ export async function schedulePeriodicJobs(): Promise<number> {
       websites: {
         where: { status: "active" },
         include: {
-          products: {
+          searchQueries: {
             where: { isActive: true },
-            select: { id: true, keywords: true },
+            select: { id: true, query: true },
           },
         },
       },
@@ -371,15 +374,15 @@ export async function schedulePeriodicJobs(): Promise<number> {
             org.serpFrequencyHours * 60 * 60 * 1000);
 
       if (serpDue) {
-        // Schedule SERP analysis for each product
-        for (const product of website.products) {
+        // Schedule SERP analysis for each search query
+        for (const searchQuery of website.searchQueries) {
           await prisma.analysisJob.create({
             data: {
               websiteId: website.id,
               type: "serp_analysis",
               payload: {
-                productId: product.id,
-                queries: product.keywords.slice(0, 5),
+                searchQueryId: searchQuery.id,
+                query: searchQuery.query,
               },
               priority: 3,
             },

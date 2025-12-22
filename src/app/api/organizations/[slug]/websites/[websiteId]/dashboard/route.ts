@@ -9,7 +9,7 @@ export async function GET(
   try {
     const { slug, websiteId } = await params;
     const user = await getUserSession();
-    
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -34,14 +34,16 @@ export async function GET(
         organizationId: membership.organization.id,
       },
       include: {
-        products: {
+        searchQueries: {
           where: { isActive: true },
           include: {
             serpResults: {
               orderBy: { createdAt: "desc" },
               take: 2,
             },
-            _count: { select: { aiSuggestions: { where: { status: "pending" } } } },
+            _count: {
+              select: { aiSuggestions: { where: { status: "pending" } } },
+            },
           },
         },
         competitors: {
@@ -67,6 +69,9 @@ export async function GET(
     return NextResponse.json({ website });
   } catch (error) {
     console.error("Website dashboard API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

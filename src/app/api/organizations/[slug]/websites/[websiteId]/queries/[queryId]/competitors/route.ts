@@ -6,19 +6,19 @@ import { withUserAuth } from "@/lib/api/middleware";
 export const dynamic = "force-dynamic";
 
 interface RouteContext {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
 interface AuthRequest extends Request {
   user: { id: string; email: string };
 }
 
-// Helper to check product access
-async function checkProductAccess(
+// Helper to check search query access
+async function checkSearchQueryAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string
+  queryId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
     where: {
@@ -31,44 +31,49 @@ async function checkProductAccess(
     return null;
   }
 
-  const product = await prisma.product.findFirst({
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       websiteId,
       website: { organizationId: membership.organizationId },
     },
     include: { website: true },
   });
 
-  return product;
+  return searchQuery;
 }
 
 /**
- * GET /api/organizations/:slug/websites/:websiteId/products/:productId/competitors
- * Get competitors for this product based on SERP results.
+ * GET /api/organizations/:slug/websites/:websiteId/queries/:queryId/competitors
+ * Get competitors for this search query based on SERP results.
  *
  * Uses SerpResult data directly from the database:
- * - Our positions come from SerpResult with productId
+ * - Our positions come from SerpResult with searchQueryId
  * - Competitor positions come from SerpResult with competitorId
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
-  // Get product's keywords
-  const productKeywords = product.keywords;
+  // Get the search query string
+  const queryString = searchQuery.query;
 
-  // Get our SERP results for this product
+  // Get our SERP results for this search query
   const ourSerpResults = await prisma.serpResult.findMany({
-    where: { productId },
+    where: { searchQueryId: queryId },
     orderBy: { createdAt: "desc" },
     select: { query: true, position: true, createdAt: true },
   });
@@ -107,7 +112,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
         }
       }
 
-      // Get all queries from our product
+      // Get all queries from our search query
       const allQueries = [...ourPositionsByKeyword.keys()];
 
       // Build comparison for queries where we have data
@@ -117,8 +122,12 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
           const theirPos = theirPositionsByKeyword.get(query);
 
           // Handle positions
-          const ourPosition = ourPos !== null && ourPos !== undefined && ourPos > 0 ? ourPos : 0;
-          const competitorPosition = theirPos !== null && theirPos !== undefined && theirPos > 0 ? theirPos : 0;
+          const ourPosition =
+            ourPos !== null && ourPos !== undefined && ourPos > 0 ? ourPos : 0;
+          const competitorPosition =
+            theirPos !== null && theirPos !== undefined && theirPos > 0
+              ? theirPos
+              : 0;
 
           // Calculate difference based on presence
           let difference: number;
@@ -160,7 +169,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       // Average position difference
       const avgDifference =
         comparison.length > 0
-          ? comparison.reduce((sum, c) => sum + c.difference, 0) / comparison.length
+          ? comparison.reduce((sum, c) => sum + c.difference, 0) /
+            comparison.length
           : 0;
 
       return {
@@ -172,7 +182,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
         totalKeywordsTracked: comparison.length,
         comparison,
         avgDifference,
-        threat: avgDifference > 5 ? "low" : avgDifference > 0 ? "medium" : "high",
+        threat:
+          avgDifference > 5 ? "low" : avgDifference > 0 ? "medium" : "high",
       };
     })
   );
@@ -194,9 +205,10 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       summary: {
         totalCompetitors: competitorData.length,
         highThreat: competitorData.filter((c) => c.threat === "high").length,
-        mediumThreat: competitorData.filter((c) => c.threat === "medium").length,
+        mediumThreat: competitorData.filter((c) => c.threat === "medium")
+          .length,
         lowThreat: competitorData.filter((c) => c.threat === "low").length,
-        ourKeywords: productKeywords,
+        searchQuery: queryString,
         searchedQueries: [...ourPositionsByKeyword.keys()],
       },
     },

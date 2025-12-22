@@ -8,7 +8,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,49 +17,38 @@ import { RefreshCw, TrendingUp, TrendingDown, Minus } from "lucide-react";
 interface SerpChartProps {
   orgSlug: string;
   websiteId: string;
-  productId: string;
+  queryId: string;
 }
 
 interface ChartDataPoint {
   date: string;
-  [keyword: string]: string | number;
+  position: number | null;
 }
 
-interface KeywordStats {
-  position: number | null;
+interface Stats {
+  currentPosition: number | null;
   change: number | null;
   trend: "up" | "down" | "stable" | "absent";
 }
 
-const COLORS = [
-  "#8884d8",
-  "#82ca9d",
-  "#ffc658",
-  "#ff7300",
-  "#00C49F",
-  "#FFBB28",
-  "#FF8042",
-  "#0088FE",
-];
-
-export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
+export function SerpChart({ orgSlug, websiteId, queryId }: SerpChartProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [stats, setStats] = useState<Record<string, KeywordStats>>({});
+  const [query, setQuery] = useState<string>("");
+  const [stats, setStats] = useState<Stats | null>(null);
   const [days, setDays] = useState(30);
 
   const fetchData = async () => {
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/serp?days=${days}`
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/serp?days=${days}`
       );
       const json = await res.json();
 
       if (json.success) {
         setChartData(json.data.chartData);
-        setKeywords(json.data.keywords);
+        setQuery(json.data.query);
         setStats(json.data.stats);
       }
     } catch (error) {
@@ -71,32 +59,14 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
   };
 
   useEffect(() => {
-    const doFetch = async () => {
-      try {
-        const res = await fetch(
-          `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/serp?days=${days}`
-        );
-        const json = await res.json();
-
-        if (json.success) {
-          setChartData(json.data.chartData);
-          setKeywords(json.data.keywords);
-          setStats(json.data.stats);
-        }
-      } catch (error) {
-        console.error("Failed to fetch SERP data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    doFetch();
-  }, [orgSlug, websiteId, productId, days]);
+    fetchData();
+  }, [orgSlug, websiteId, queryId, days]);
 
   const triggerAnalysis = async () => {
     setRefreshing(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/serp`,
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/serp`,
         { 
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -141,7 +111,7 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
           <div>
             <CardTitle>Évolution du positionnement</CardTitle>
             <CardDescription>
-              Suivi des positions sur les moteurs de recherche
+              Suivi de la position pour la requête "{query}"
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -178,58 +148,45 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
         ) : (
           <>
             {/* Stats summary */}
-            <div className="grid gap-4 md:grid-cols-4 mb-6">
-              {keywords.slice(0, 4).map((kw, i) => {
-                const stat = stats[kw];
-                return (
-                  <div
-                    key={kw}
-                    className="flex items-center gap-3 p-3 rounded-lg border"
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: COLORS[i % COLORS.length] }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" title={kw}>
-                        {kw}
-                      </p>
-                      {stat && (
-                        <div className="flex items-center gap-1">
-                          {stat.position === null ? (
-                            <span className="text-lg font-bold text-orange-500">Absent</span>
-                          ) : (
-                            <span className="text-lg font-bold">#{stat.position}</span>
-                          )}
-                          {stat.trend === "up" && (
-                            <TrendingUp className="w-4 h-4 text-green-500" />
-                          )}
-                          {stat.trend === "down" && (
-                            <TrendingDown className="w-4 h-4 text-red-500" />
-                          )}
-                          {stat.trend === "stable" && (
-                            <Minus className="w-4 h-4 text-gray-400" />
-                          )}
-                          {stat.trend === "absent" && (
-                            <span className="text-xs text-orange-500">Non classé</span>
-                          )}
-                          {stat.change !== null && stat.change !== 0 && (
-                            <span
-                              className={`text-xs ${
-                                stat.change > 0 ? "text-green-600" : "text-red-600"
-                              }`}
-                            >
-                              {stat.change > 0 ? "+" : ""}
-                              {stat.change}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+            {stats && (
+              <div className="flex items-center gap-3 p-4 rounded-lg border mb-6">
+                <div className="w-3 h-3 rounded-full bg-primary" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" title={query}>
+                    {query}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {stats.currentPosition === null ? (
+                      <span className="text-2xl font-bold text-orange-500">Absent</span>
+                    ) : (
+                      <span className="text-2xl font-bold">#{stats.currentPosition}</span>
+                    )}
+                    {stats.trend === "up" && (
+                      <TrendingUp className="w-5 h-5 text-green-500" />
+                    )}
+                    {stats.trend === "down" && (
+                      <TrendingDown className="w-5 h-5 text-red-500" />
+                    )}
+                    {stats.trend === "stable" && (
+                      <Minus className="w-5 h-5 text-gray-400" />
+                    )}
+                    {stats.trend === "absent" && (
+                      <span className="text-sm text-orange-500">Non classé</span>
+                    )}
+                    {stats.change !== null && stats.change !== 0 && (
+                      <span
+                        className={`text-sm font-medium ${
+                          stats.change > 0 ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
+                        {stats.change > 0 ? "+" : ""}
+                        {stats.change} positions
+                      </span>
+                    )}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            )}
 
             {/* Chart */}
             <div className="h-[300px]">
@@ -256,21 +213,18 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
                     labelFormatter={(label) => formatDate(label as string)}
                     formatter={(value) => [
                       value === null || value === undefined ? "Absent" : `#${value}`,
+                      "Position"
                     ]}
                   />
-                  <Legend />
-                  {keywords.map((kw, i) => (
-                    <Line
-                      key={kw}
-                      type="monotone"
-                      dataKey={kw}
-                      stroke={COLORS[i % COLORS.length]}
-                      strokeWidth={2}
-                      dot={{ r: 4 }}
-                      activeDot={{ r: 6 }}
-                      connectNulls
-                    />
-                  ))}
+                  <Line
+                    type="monotone"
+                    dataKey="position"
+                    stroke="#8884d8"
+                    strokeWidth={2}
+                    dot={{ r: 4 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>

@@ -58,9 +58,9 @@ export const GET = withUserAuth(
     const { website } = access;
 
     // Get related counts
-    const [productCount, competitorCount, reportCount, pendingJobs] =
+    const [queryCount, competitorCount, reportCount, pendingJobs] =
       await Promise.all([
-        prisma.product.count({ where: { websiteId: website!.id } }),
+        prisma.searchQuery.count({ where: { websiteId: website!.id } }),
         prisma.competitor.count({ where: { websiteId: website!.id } }),
         prisma.aIReport.count({ where: { websiteId: website!.id } }),
         prisma.analysisJob.count({
@@ -87,7 +87,7 @@ export const GET = withUserAuth(
         status: website!.status,
         sitemapUrl: website!.sitemapUrl,
         lastSitemapFetch: website!.lastSitemapFetch,
-        productCount,
+        queryCount,
         competitorCount,
         reportCount,
         pendingJobs,

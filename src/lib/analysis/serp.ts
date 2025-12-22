@@ -10,38 +10,44 @@ interface SerpAnalysisResult {
 }
 
 /**
- * Run SERP analysis for a product's keywords
+ * Run SERP analysis for a search query
  */
 export async function runSerpAnalysis(
   websiteId: string,
-  productId: string,
+  searchQueryId: string,
   queries: string[]
 ): Promise<SerpAnalysisResult[]> {
   console.log(`[SERP runSerpAnalysis] ===== Starting SERP analysis =====`);
   console.log(`[SERP runSerpAnalysis] websiteId: ${websiteId}`);
-  console.log(`[SERP runSerpAnalysis] productId: ${productId}`);
+  console.log(`[SERP runSerpAnalysis] searchQueryId: ${searchQueryId}`);
   console.log(
     `[SERP runSerpAnalysis] queries: ${queries.length} queries`,
     queries
   );
 
   const website = await prisma.website.findUnique({ where: { id: websiteId } });
-  const product = await prisma.product.findUnique({ where: { id: productId } });
+  const searchQuery = await prisma.searchQuery.findUnique({
+    where: { id: searchQueryId },
+  });
 
-  if (!website || !product) {
-    console.error(`[SERP runSerpAnalysis] ❌ Website or product not found`);
-    throw new Error("Website or product not found");
+  if (!website || !searchQuery) {
+    console.error(
+      `[SERP runSerpAnalysis] ❌ Website or search query not found`
+    );
+    throw new Error("Website or search query not found");
   }
 
   console.log(
     `[SERP runSerpAnalysis] Website: ${website.name} (${website.url})`
   );
-  console.log(`[SERP runSerpAnalysis] Product: ${product.name}`);
+  console.log(`[SERP runSerpAnalysis] Search Query: ${searchQuery.title}`);
 
   const websiteDomain = new URL(website.url).hostname;
   // Normalize domain (remove www.) for comparison
   const ourDomain = websiteDomain.replace(/^www\./, "");
-  console.log(`[SERP runSerpAnalysis] Looking for domain: ${websiteDomain} (normalized: ${ourDomain})`);
+  console.log(
+    `[SERP runSerpAnalysis] Looking for domain: ${websiteDomain} (normalized: ${ourDomain})`
+  );
 
   const results: SerpAnalysisResult[] = [];
 
@@ -61,9 +67,12 @@ export async function runSerpAnalysis(
       console.log(
         `[SERP runSerpAnalysis] Received ${serpResponse.results.length} results from BrightData`
       );
-      
+
       // Log all domains for debugging
-      console.log(`[SERP runSerpAnalysis] All domains in results:`, serpResponse.results.map(r => r.domain));
+      console.log(
+        `[SERP runSerpAnalysis] All domains in results:`,
+        serpResponse.results.map((r) => r.domain)
+      );
 
       // Store raw SERP data in blob
       console.log(`[SERP runSerpAnalysis] Storing SERP data in blob...`);
@@ -78,8 +87,7 @@ export async function runSerpAnalysis(
       const ourResult = serpResponse.results.find((r) => {
         const resultDomain = r.domain.replace(/^www\./, "");
         return (
-          resultDomain === ourDomain ||
-          resultDomain.endsWith(`.${ourDomain}`)
+          resultDomain === ourDomain || resultDomain.endsWith(`.${ourDomain}`)
         );
       });
 
@@ -88,11 +96,11 @@ export async function runSerpAnalysis(
         ourResult ? `#${ourResult.position} (${ourResult.url})` : "NOT FOUND"
       );
 
-      // Save SERP result for the product
+      // Save SERP result for the search query
       console.log(`[SERP runSerpAnalysis] Saving SERP result to database...`);
       await prisma.serpResult.create({
         data: {
-          productId,
+          searchQueryId,
           query,
           position: ourResult?.position || null,
           url: ourResult?.url || null,
@@ -193,7 +201,7 @@ export async function runSerpAnalysis(
  */
 export async function reanalyzeSerpFromBlob(
   websiteId: string,
-  productId: string
+  searchQueryId: string
 ): Promise<{
   reanalyzed: number;
   positionsUpdated: number;
@@ -203,10 +211,12 @@ export async function reanalyzeSerpFromBlob(
   console.log(`[SERP reanalyzeSerpFromBlob] Starting re-analysis...`);
 
   const website = await prisma.website.findUnique({ where: { id: websiteId } });
-  const product = await prisma.product.findUnique({ where: { id: productId } });
+  const searchQuery = await prisma.searchQuery.findUnique({
+    where: { id: searchQueryId },
+  });
 
-  if (!website || !product) {
-    throw new Error("Website or product not found");
+  if (!website || !searchQuery) {
+    throw new Error("Website or search query not found");
   }
 
   const websiteDomain = new URL(website.url).hostname;
@@ -219,7 +229,7 @@ export async function reanalyzeSerpFromBlob(
   // Get all SERP results with blob URLs
   const serpResults = await prisma.serpResult.findMany({
     where: {
-      productId,
+      searchQueryId,
       rawDataBlobUrl: { not: null },
     },
     orderBy: { createdAt: "desc" },
@@ -274,13 +284,20 @@ export async function reanalyzeSerpFromBlob(
       );
 
       // Find our position with normalized domain matching
-      const ourResult = serpData.results.find((r: { domain: string; position: number; url: string; title?: string }) => {
-        const normalizedResultDomain = r.domain.replace(/^www\./, "");
-        return (
-          normalizedResultDomain === normalizedWebsiteDomain ||
-          normalizedResultDomain.endsWith(`.${normalizedWebsiteDomain}`)
-        );
-      });
+      const ourResult = serpData.results.find(
+        (r: {
+          domain: string;
+          position: number;
+          url: string;
+          title?: string;
+        }) => {
+          const normalizedResultDomain = r.domain.replace(/^www\./, "");
+          return (
+            normalizedResultDomain === normalizedWebsiteDomain ||
+            normalizedResultDomain.endsWith(`.${normalizedWebsiteDomain}`)
+          );
+        }
+      );
 
       console.log(
         `[SERP reanalyzeSerpFromBlob] Our position for "${query}":`,
@@ -292,7 +309,10 @@ export async function reanalyzeSerpFromBlob(
       );
 
       // Update position if different
-      if (ourResult && (serpResult.position !== ourResult.position || !serpResult.url)) {
+      if (
+        ourResult &&
+        (serpResult.position !== ourResult.position || !serpResult.url)
+      ) {
         console.log(
           `[SERP reanalyzeSerpFromBlob] Updating position from ${serpResult.position} to ${ourResult.position}`
         );

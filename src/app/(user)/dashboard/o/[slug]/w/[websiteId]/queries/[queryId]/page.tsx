@@ -3,21 +3,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ExternalLink } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, Search, Zap, Mountain } from "lucide-react";
 import { SerpChart } from "./_components/SerpChart";
 import { CompetitorsList } from "./_components/CompetitorsList";
 import { SuggestionsList } from "./_components/SuggestionsList";
-import { KeywordsManager } from "./_components/KeywordsManager";
 import { MetaComparisonBlock } from "./_components/MetaComparisonBlock";
 import { AISuggestionsBlock } from "./_components/AISuggestionsBlock";
 
 interface PageProps {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
-export default async function ProductDetailPage({ params }: PageProps) {
-  const { slug, websiteId, productId } = await params;
+export default async function QueryDetailPage({ params }: PageProps) {
+  const { slug, websiteId, queryId } = await params;
   const user = await getUserSession();
   if (!user) redirect("/");
 
@@ -34,10 +32,10 @@ export default async function ProductDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  // Get product with SERP history
-  const product = await prisma.product.findFirst({
+  // Get search query with SERP history
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       website: {
         id: websiteId,
         organizationId: membership.organizationId,
@@ -58,17 +56,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
     },
   });
 
-  if (!product) {
+  if (!searchQuery) {
     notFound();
   }
 
   // Calculate position trend
-  const latestPosition = product.serpResults[0]?.position;
-  const previousPosition = product.serpResults[1]?.position;
+  const latestPosition = searchQuery.serpResults[0]?.position;
+  const previousPosition = searchQuery.serpResults[1]?.position;
   const hasPosition = latestPosition !== null && latestPosition !== undefined && latestPosition > 0;
   let trend: "up" | "down" | "stable" | "absent" | null = null;
   
-  if (!hasPosition && product.serpResults.length > 0) {
+  if (!hasPosition && searchQuery.serpResults.length > 0) {
     trend = "absent";
   } else if (hasPosition && previousPosition !== null && previousPosition !== undefined && previousPosition > 0) {
     if (latestPosition < previousPosition) trend = "up";
@@ -81,25 +79,36 @@ export default async function ProductDetailPage({ params }: PageProps) {
       {/* Header */}
       <div className="mb-8">
         <Link
-          href={`/dashboard/o/${slug}/w/${websiteId}/products`}
+          href={`/dashboard/o/${slug}/w/${websiteId}/queries`}
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
-          Retour aux produits
+          Retour aux requêtes
         </Link>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold">{product.name}</h1>
-              {!product.isActive && (
+              <h1 className="text-3xl font-bold">{searchQuery.title}</h1>
+              {!searchQuery.isActive && (
                 <span className="text-sm font-normal text-muted-foreground bg-muted px-3 py-1 rounded">
                   Inactif
                 </span>
               )}
+              {searchQuery.competitionLevel === "HIGH" ? (
+                <span className="inline-flex items-center gap-1 text-sm font-normal text-orange-600 bg-orange-100 px-3 py-1 rounded">
+                  <Zap className="w-4 h-4" />
+                  Forte concurrence
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-sm font-normal text-green-600 bg-green-100 px-3 py-1 rounded">
+                  <Mountain className="w-4 h-4" />
+                  Longue traîne
+                </span>
+              )}
             </div>
-            <p className="text-muted-foreground">{product.description}</p>
+            <p className="text-muted-foreground">{searchQuery.description}</p>
           </div>
-          {product.serpResults.length > 0 && (
+          {searchQuery.serpResults.length > 0 && (
             <div className="flex items-center gap-3 ml-8">
               {trend === "up" && <TrendingUp className="w-6 h-6 text-green-500" />}
               {trend === "down" && <TrendingDown className="w-6 h-6 text-red-500" />}
@@ -120,53 +129,62 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Keywords - Client Component for editing */}
-          <KeywordsManager
-            orgSlug={slug}
-            websiteId={websiteId}
-            productId={productId}
-            initialKeywords={product.keywords}
-          />
+          {/* Search Query Display */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="w-5 h-5" />
+                Requête de recherche
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-4 py-2 rounded-lg text-lg font-medium bg-primary/10 text-primary">
+                  {searchQuery.query}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* SERP Chart - Client Component */}
           <SerpChart
             orgSlug={slug}
             websiteId={websiteId}
-            productId={productId}
+            queryId={queryId}
           />
 
           {/* Competitors - Client Component */}
           <CompetitorsList
             orgSlug={slug}
             websiteId={websiteId}
-            productId={productId}
+            queryId={queryId}
           />
 
           {/* Meta Comparison - Client Component */}
           <MetaComparisonBlock
             orgSlug={slug}
             websiteId={websiteId}
-            productId={productId}
+            queryId={queryId}
           />
 
           {/* AI Suggestions - Client Component */}
           <AISuggestionsBlock
             orgSlug={slug}
             websiteId={websiteId}
-            productId={productId}
+            queryId={queryId}
           />
 
           {/* Suggestions - Client Component */}
           <SuggestionsList
             orgSlug={slug}
             websiteId={websiteId}
-            productId={productId}
+            queryId={queryId}
           />
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Product Info */}
+          {/* Query Info */}
           <Card>
             <CardHeader>
               <CardTitle>Informations</CardTitle>
@@ -174,50 +192,45 @@ export default async function ProductDetailPage({ params }: PageProps) {
             <CardContent className="space-y-4">
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Confiance IA</div>
-                <div className="text-2xl font-bold">{Math.round(product.confidence * 100)}%</div>
+                <div className="text-2xl font-bold">{Math.round(searchQuery.confidence * 100)}%</div>
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                   <div
                     className="bg-primary h-2 rounded-full"
-                    style={{ width: `${product.confidence * 100}%` }}
+                    style={{ width: `${searchQuery.confidence * 100}%` }}
                   />
                 </div>
               </div>
 
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Analyses SERP</div>
-                <div className="text-2xl font-bold">{product._count.serpResults}</div>
+                <div className="text-2xl font-bold">{searchQuery._count.serpResults}</div>
               </div>
 
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Suggestions IA</div>
-                <div className="text-2xl font-bold">{product._count.aiSuggestions}</div>
+                <div className="text-2xl font-bold">{searchQuery._count.aiSuggestions}</div>
               </div>
 
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Site web</div>
-                <div className="text-sm">{product.website.name}</div>
+                <div className="text-sm">{searchQuery.website.name}</div>
               </div>
 
-              {product.sourceUrl && (
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground mb-1">Page source</div>
-                  <Button variant="outline" size="sm" className="w-full" asChild>
-                    <a href={product.sourceUrl} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Voir la page
-                    </a>
-                  </Button>
+              <div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">Niveau de concurrence</div>
+                <div className="text-sm">
+                  {searchQuery.competitionLevel === "HIGH" ? "Forte (requête générique)" : "Faible (longue traîne)"}
                 </div>
-              )}
+              </div>
 
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Créé le</div>
-                <div className="text-sm">{new Date(product.createdAt).toLocaleDateString("fr-FR")}</div>
+                <div className="text-sm">{new Date(searchQuery.createdAt).toLocaleDateString("fr-FR")}</div>
               </div>
 
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Dernière mise à jour</div>
-                <div className="text-sm">{new Date(product.updatedAt).toLocaleDateString("fr-FR")}</div>
+                <div className="text-sm">{new Date(searchQuery.updatedAt).toLocaleDateString("fr-FR")}</div>
               </div>
             </CardContent>
           </Card>

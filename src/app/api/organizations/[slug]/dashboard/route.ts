@@ -9,7 +9,7 @@ export async function GET(
   try {
     const { slug } = await params;
     const user = await getUserSession();
-    
+
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -35,7 +35,9 @@ export async function GET(
     const websites = await prisma.website.findMany({
       where: { organizationId: organization.id },
       include: {
-        _count: { select: { products: true, competitors: true, aiReports: true } },
+        _count: {
+          select: { searchQueries: true, competitors: true, aiReports: true },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -46,14 +48,17 @@ export async function GET(
       include: { user: { select: { email: true, name: true } } },
     });
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       organization,
       role,
       websites,
-      members 
+      members,
     });
   } catch (error) {
     console.error("Organization dashboard API error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

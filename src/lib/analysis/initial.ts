@@ -5,7 +5,7 @@ import { storage } from "@/lib/storage";
 
 interface InitialAnalysisResult {
   success: boolean;
-  productsIdentified: number;
+  searchQueriesIdentified: number;
   pagesAnalyzed: number;
   error?: string;
 }
@@ -33,9 +33,15 @@ export async function runInitialAnalysis(
       data: { status: "analyzing" },
     });
 
+    console.log(`[Analysis] 🚀 Starting initial analysis for ${website.name}`);
+
     // Step 1: Fetch sitemap
-    console.log(`[Analysis] Fetching sitemap for ${website.url}`);
+    console.log(`[Analysis] Step 1/7: Fetching sitemap for ${website.url}`);
     const sitemap = await brightdata.fetchSitemap(website.url);
+
+    console.log(
+      `[Analysis] ✓ Sitemap fetched - ${sitemap.urls.length} URLs found`
+    );
 
     // Store sitemap in blob
     await storage.storeSitemap(websiteId, sitemap.sitemapUrl, sitemap);
@@ -50,15 +56,19 @@ export async function runInitialAnalysis(
     });
 
     // Step 2: Select key pages to analyze (just homepage for initial analysis)
+    console.log(`[Analysis] Step 2/7: Selecting key pages to analyze...`);
     const urlsToAnalyze = selectKeyPages(
       sitemap.urls.map((u) => u.loc),
       website.url,
       1
     );
 
-    console.log(`[Analysis] Analyzing ${urlsToAnalyze.length} pages`);
+    console.log(
+      `[Analysis] ✓ Selected ${urlsToAnalyze.length} page(s) to analyze`
+    );
 
     // Step 3: Scrape and analyze each page
+    console.log(`[Analysis] Step 3/7: Scraping pages...`);
     const pageContents: Array<{
       url: string;
       title: string | null;
@@ -113,31 +123,47 @@ export async function runInitialAnalysis(
       throw new Error("Failed to analyze any pages");
     }
 
-    // Step 4: Use AI to identify products/services
-    console.log(`[Analysis] Running AI analysis`);
-    const aiResult = await mistral.identifyProductsAndServices(
+    console.log(
+      `[Analysis] ✓ Successfully scraped ${pageContents.length} page(s)`
+    );
+
+    // Step 4: Use AI to identify search queries
+    console.log(
+      `[Analysis] Step 4/7: Running AI analysis (identifying search queries)...`
+    );
+    const aiResult = await mistral.identifySearchQueries(
       website.name,
       website.url,
       pageContents
     );
 
-    // Step 5: Save identified products
-    const createdProducts: string[] = [];
-    for (const product of aiResult.products) {
-      const created = await prisma.product.create({
+    console.log(
+      `[Analysis] ✓ AI analysis completed - ${aiResult.searchQueries.length} search query(ies) identified`
+    );
+
+    // Step 5: Save identified search queries
+    console.log(`[Analysis] Step 5/7: Saving identified search queries...`);
+    const createdSearchQueries: string[] = [];
+    for (const sq of aiResult.searchQueries) {
+      const created = await prisma.searchQuery.create({
         data: {
           websiteId,
-          name: product.name,
-          description: product.description,
-          keywords: product.keywords,
-          sourceUrl: product.sourceUrl,
-          confidence: product.confidence,
+          title: sq.title,
+          description: sq.description,
+          query: sq.query,
+          competitionLevel: sq.competitionLevel,
+          confidence: sq.confidence,
         },
       });
-      createdProducts.push(created.id);
+      createdSearchQueries.push(created.id);
     }
 
+    console.log(
+      `[Analysis] ✓ Saved ${createdSearchQueries.length} search query(ies) to database`
+    );
+
     // Step 6: Save AI report
+    console.log(`[Analysis] Step 6/7: Generating analysis report...`);
     await prisma.aIReport.create({
       data: {
         websiteId,
@@ -146,25 +172,28 @@ export async function runInitialAnalysis(
         content: formatInitialReport(aiResult, pageContents.length),
         metadata: {
           pagesAnalyzed: pageContents.length,
-          productsIdentified: aiResult.products.length,
+          searchQueriesIdentified: aiResult.searchQueries.length,
           recommendations: aiResult.recommendations,
         },
       },
     });
 
-    // Step 7: Schedule SERP analysis jobs for each product
-    for (const productId of createdProducts) {
-      const product = await prisma.product.findUnique({
-        where: { id: productId },
+    console.log(`[Analysis] ✓ Analysis report saved`);
+
+    // Step 7: Schedule SERP analysis jobs for each search query
+    console.log(`[Analysis] Step 7/7: Scheduling SERP analysis jobs...`);
+    for (const searchQueryId of createdSearchQueries) {
+      const searchQuery = await prisma.searchQuery.findUnique({
+        where: { id: searchQueryId },
       });
-      if (product) {
+      if (searchQuery) {
         await prisma.analysisJob.create({
           data: {
             websiteId,
             type: "serp_analysis",
             payload: {
-              productId,
-              queries: product.keywords.slice(0, 5), // Top 5 keywords
+              searchQueryId,
+              query: searchQuery.query,
             },
             priority: 5,
           },
@@ -172,15 +201,23 @@ export async function runInitialAnalysis(
       }
     }
 
+    console.log(
+      `[Analysis] ✓ Scheduled ${createdSearchQueries.length} SERP analysis job(s)`
+    );
+
     // Update website status to active
     await prisma.website.update({
       where: { id: websiteId },
       data: { status: "active" },
     });
 
+    console.log(
+      `[Analysis] ✅ Initial analysis completed successfully - ${aiResult.searchQueries.length} search queries, ${pageContents.length} pages analyzed`
+    );
+
     return {
       success: true,
-      productsIdentified: aiResult.products.length,
+      searchQueriesIdentified: aiResult.searchQueries.length,
       pagesAnalyzed: pageContents.length,
     };
   } catch (error) {
@@ -194,7 +231,7 @@ export async function runInitialAnalysis(
 
     return {
       success: false,
-      productsIdentified: 0,
+      searchQueriesIdentified: 0,
       pagesAnalyzed: 0,
       error: error instanceof Error ? error.message : "Unknown error",
     };
@@ -262,18 +299,25 @@ function selectKeyPages(
  */
 function formatInitialReport(
   aiResult: {
-    products: Array<{ name: string; description: string; keywords: string[] }>;
+    searchQueries: Array<{
+      title: string;
+      description: string;
+      query: string;
+      competitionLevel: string;
+    }>;
     summary: string;
     recommendations: string[];
   },
   pagesAnalyzed: number
 ): string {
-  const productList = aiResult.products
+  const queryList = aiResult.searchQueries
     .map(
-      (p, i) =>
-        `### ${i + 1}. ${p.name}\n${
-          p.description
-        }\n\n**Mots-clés**: ${p.keywords.join(", ")}`
+      (sq, i) =>
+        `### ${i + 1}. ${sq.title}\n${sq.description}\n\n**Requête**: \`${
+          sq.query
+        }\` (${
+          sq.competitionLevel === "HIGH" ? "Forte concurrence" : "Longue traîne"
+        })`
     )
     .join("\n\n");
 
@@ -287,11 +331,11 @@ function formatInitialReport(
 ${aiResult.summary}
 
 ## Pages Analysées
-${pagesAnalyzed} pages ont été analysées pour identifier vos produits et services.
+${pagesAnalyzed} pages ont été analysées pour identifier les requêtes de recherche pertinentes.
 
-## Produits et Services Identifiés
+## Requêtes de Recherche Identifiées
 
-${productList}
+${queryList}
 
 ## Recommandations Initiales
 

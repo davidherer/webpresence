@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { withUserAuth } from "@/lib/api/middleware";
 
 interface RouteContext {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
 interface AuthRequest extends Request {
@@ -12,219 +12,29 @@ interface AuthRequest extends Request {
 
 // French stopwords to filter out
 const FRENCH_STOPWORDS = new Set([
-  "le",
-  "la",
-  "les",
-  "de",
-  "du",
-  "des",
-  "un",
-  "une",
-  "et",
-  "en",
-  "à",
-  "au",
-  "aux",
-  "ce",
-  "ces",
-  "cette",
-  "pour",
-  "par",
-  "sur",
-  "avec",
-  "dans",
-  "qui",
-  "que",
-  "quoi",
-  "dont",
-  "où",
-  "son",
-  "sa",
-  "ses",
-  "leur",
-  "leurs",
-  "nous",
-  "vous",
-  "ils",
-  "elles",
-  "est",
-  "sont",
-  "être",
-  "avoir",
-  "fait",
-  "faire",
-  "plus",
-  "moins",
-  "très",
-  "bien",
-  "tout",
-  "tous",
-  "toute",
-  "toutes",
-  "même",
-  "aussi",
-  "comme",
-  "mais",
-  "ou",
-  "donc",
-  "car",
-  "ni",
-  "si",
-  "pas",
-  "ne",
-  "sans",
-  "sous",
-  "entre",
-  "vers",
-  "chez",
-  "après",
-  "avant",
-  "depuis",
-  "pendant",
-  "selon",
-  "contre",
-  "malgré",
-  "grâce",
-  "votre",
-  "notre",
-  "nos",
-  "vos",
-  "mon",
-  "ma",
-  "mes",
-  "ton",
-  "ta",
-  "tes",
-  "lui",
-  "elle",
-  "eux",
-  "cela",
-  "ceci",
-  "celui",
-  "celle",
-  "ceux",
-  "celles",
-  "lequel",
-  "laquelle",
-  "lesquels",
-  "été",
-  "était",
-  "ont",
-  "sera",
-  "seront",
-  "peut",
-  "peuvent",
-  "doit",
-  "doivent",
-  "the",
-  "a",
-  "an",
-  "and",
-  "or",
-  "of",
-  "to",
-  "in",
-  "is",
-  "are",
-  "was",
-  "were",
-  "be",
-  "been",
-  "being",
-  "have",
-  "has",
-  "had",
-  "do",
-  "does",
-  "did",
-  "will",
-  "would",
-  "could",
-  "should",
-  "may",
-  "might",
-  "must",
-  "shall",
-  "can",
-  "need",
-  "dare",
-  "ought",
-  "used",
-  "it",
-  "its",
-  "this",
-  "that",
-  "these",
-  "those",
-  "i",
-  "you",
-  "he",
-  "she",
-  "we",
-  "they",
-  "what",
-  "which",
-  "who",
-  "whom",
-  "whose",
-  "where",
-  "when",
-  "why",
-  "how",
-  "all",
-  "each",
-  "every",
-  "both",
-  "few",
-  "more",
-  "most",
-  "other",
-  "some",
-  "such",
-  "no",
-  "nor",
-  "not",
-  "only",
-  "own",
-  "same",
-  "so",
-  "than",
-  "too",
-  "very",
-  "just",
-  "but",
-  "if",
-  "then",
-  "because",
-  "as",
-  "until",
-  "while",
-  "at",
-  "by",
-  "for",
-  "with",
-  "about",
-  "against",
-  "between",
-  "into",
-  "through",
-  "during",
-  "before",
-  "after",
-  "above",
-  "below",
-  "from",
-  "up",
-  "down",
-  "out",
-  "off",
-  "over",
-  "under",
-  "again",
-  "further",
-  "once",
-  "here",
-  "there",
+  "le", "la", "les", "de", "du", "des", "un", "une", "et", "en", "à", "au",
+  "aux", "ce", "ces", "cette", "pour", "par", "sur", "avec", "dans", "qui",
+  "que", "quoi", "dont", "où", "son", "sa", "ses", "leur", "leurs", "nous",
+  "vous", "ils", "elles", "est", "sont", "être", "avoir", "fait", "faire",
+  "plus", "moins", "très", "bien", "tout", "tous", "toute", "toutes", "même",
+  "aussi", "comme", "mais", "ou", "donc", "car", "ni", "si", "pas", "ne",
+  "sans", "sous", "entre", "vers", "chez", "après", "avant", "depuis",
+  "pendant", "selon", "contre", "malgré", "grâce", "votre", "notre", "nos",
+  "vos", "mon", "ma", "mes", "ton", "ta", "tes", "lui", "elle", "eux", "cela",
+  "ceci", "celui", "celle", "ceux", "celles", "lequel", "laquelle", "lesquels",
+  "été", "était", "ont", "sera", "seront", "peut", "peuvent", "doit", "doivent",
+  "the", "a", "an", "and", "or", "of", "to", "in", "is", "are", "was", "were",
+  "be", "been", "being", "have", "has", "had", "do", "does", "did", "will",
+  "would", "could", "should", "may", "might", "must", "shall", "can", "need",
+  "dare", "ought", "used", "it", "its", "this", "that", "these", "those", "i",
+  "you", "he", "she", "we", "they", "what", "which", "who", "whom", "whose",
+  "where", "when", "why", "how", "all", "each", "every", "both", "few", "more",
+  "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same",
+  "so", "than", "too", "very", "just", "but", "if", "then", "because", "as",
+  "until", "while", "at", "by", "for", "with", "about", "against", "between",
+  "into", "through", "during", "before", "after", "above", "below", "from",
+  "up", "down", "out", "off", "over", "under", "again", "further", "once",
+  "here", "there",
 ]);
 
 // Extract meaningful keywords from text
@@ -275,12 +85,12 @@ function extractBigrams(text: string | null): Map<string, number> {
   return bigrams;
 }
 
-// Helper to check product access
-async function checkProductAccess(
+// Helper to check search query access
+async function checkSearchQueryAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string
+  queryId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
     where: {
@@ -293,54 +103,40 @@ async function checkProductAccess(
     return null;
   }
 
-  const product = await prisma.product.findFirst({
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       websiteId,
       website: { organizationId: membership.organizationId },
     },
     include: { website: true },
   });
 
-  return product;
+  return searchQuery;
 }
 
 /**
- * GET /api/organizations/:slug/websites/:websiteId/products/:productId/meta-comparison
+ * GET /api/organizations/:slug/websites/:websiteId/queries/:queryId/meta-comparison
  * Get SEO metadata comparison between client and competitors
  * Includes deep keyword analysis
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(user.id, slug, websiteId, queryId);
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
-  // Get client's page analysis (from the sourceUrl of the product)
-  let clientPageAnalysis = null;
-  if (product.sourceUrl) {
-    clientPageAnalysis = await prisma.pageAnalysis.findFirst({
-      where: {
-        websiteId,
-        url: product.sourceUrl,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  // If no analysis from sourceUrl, try to get the most recent one for this website
-  if (!clientPageAnalysis) {
-    clientPageAnalysis = await prisma.pageAnalysis.findFirst({
-      where: { websiteId },
-      orderBy: { createdAt: "desc" },
-    });
-  }
+  // Get client's page analysis
+  const clientPageAnalysis = await prisma.pageAnalysis.findFirst({
+    where: { websiteId },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Get competitors for this website
   const competitors = await prisma.competitor.findMany({
@@ -541,7 +337,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Build client data
   const clientData = {
-    url: product.sourceUrl || product.website.url,
+    url: searchQuery.website.url,
+    searchQuery: searchQuery.query,
     title: clientTitle,
     metaDescription: clientDescription,
     titleLength: clientTitle?.length || 0,

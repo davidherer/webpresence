@@ -15,13 +15,12 @@ import {
   Type,
   List,
   PlusCircle,
-  Tag,
 } from "lucide-react";
 
 interface SuggestionsListProps {
   orgSlug: string;
   websiteId: string;
-  productId: string;
+  queryId: string;
 }
 
 interface Suggestion {
@@ -90,7 +89,7 @@ const TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: stri
   },
 };
 
-export function SuggestionsList({ orgSlug, websiteId, productId }: SuggestionsListProps) {
+export function SuggestionsList({ orgSlug, websiteId, queryId }: SuggestionsListProps) {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -102,7 +101,7 @@ export function SuggestionsList({ orgSlug, websiteId, productId }: SuggestionsLi
     try {
       const statusParam = filter === "all" ? "" : `?status=${filter}`;
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/suggestions${statusParam}`
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/suggestions${statusParam}`
       );
       const json = await res.json();
 
@@ -118,33 +117,15 @@ export function SuggestionsList({ orgSlug, websiteId, productId }: SuggestionsLi
   };
 
   useEffect(() => {
-    const doFetch = async () => {
-      setLoading(true);
-      try {
-        const statusParam = filter === "all" ? "" : `?status=${filter}`;
-        const res = await fetch(
-          `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/suggestions${statusParam}`
-        );
-        const json = await res.json();
-
-        if (json.success) {
-          setSuggestions(json.data.suggestions);
-          setStats(json.data.stats);
-        }
-      } catch (error) {
-        console.error("Failed to fetch suggestions:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    doFetch();
-  }, [orgSlug, websiteId, productId, filter]);
+    setLoading(true);
+    fetchData();
+  }, [orgSlug, websiteId, queryId, filter]);
 
   const generateSuggestions = async () => {
     setGenerating(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/suggestions`,
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/suggestions`,
         { method: "POST" }
       );
       const json = await res.json();
@@ -166,7 +147,7 @@ export function SuggestionsList({ orgSlug, websiteId, productId }: SuggestionsLi
     setUpdatingId(suggestionId);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/suggestions/${suggestionId}`,
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/suggestions/${suggestionId}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

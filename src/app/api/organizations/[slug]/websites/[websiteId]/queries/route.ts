@@ -5,17 +5,18 @@ import { z } from "zod";
 
 type RouteContext = { params: Promise<{ slug: string; websiteId: string }> };
 
-const createProductSchema = z.object({
-  name: z.string().min(1).max(200),
+const createSearchQuerySchema = z.object({
+  title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
-  keywords: z.array(z.string()).min(1).max(20),
-  sourceUrl: z.string().url().optional(),
+  query: z.string().min(1).max(200),
+  competitionLevel: z.enum(["HIGH", "LOW"]).default("HIGH"),
 });
 
-const updateProductSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
+const updateSearchQuerySchema = z.object({
+  title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
-  keywords: z.array(z.string()).max(20).optional(),
+  query: z.string().min(1).max(200).optional(),
+  competitionLevel: z.enum(["HIGH", "LOW"]).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -44,7 +45,7 @@ async function checkWebsiteAccess(
   return { website, role: membership.role };
 }
 
-// GET /api/organizations/[slug]/websites/[websiteId]/products
+// GET /api/organizations/[slug]/websites/[websiteId]/queries
 export const GET = withUserAuth(
   async (req: NextRequest, context: RouteContext) => {
     const user = (req as typeof req & { user: { id: string } }).user;
@@ -61,7 +62,7 @@ export const GET = withUserAuth(
     const url = new URL(req.url);
     const includeInactive = url.searchParams.get("includeInactive") === "true";
 
-    const products = await prisma.product.findMany({
+    const searchQueries = await prisma.searchQuery.findMany({
       where: {
         websiteId,
         ...(includeInactive ? {} : { isActive: true }),
@@ -76,23 +77,23 @@ export const GET = withUserAuth(
 
     return NextResponse.json({
       success: true,
-      data: products.map((p) => ({
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        keywords: p.keywords,
-        sourceUrl: p.sourceUrl,
-        confidence: p.confidence,
-        isActive: p.isActive,
-        serpCount: p._count.serpResults,
-        suggestionCount: p._count.aiSuggestions,
-        createdAt: p.createdAt,
+      data: searchQueries.map((sq) => ({
+        id: sq.id,
+        title: sq.title,
+        description: sq.description,
+        query: sq.query,
+        competitionLevel: sq.competitionLevel,
+        confidence: sq.confidence,
+        isActive: sq.isActive,
+        serpCount: sq._count.serpResults,
+        suggestionCount: sq._count.aiSuggestions,
+        createdAt: sq.createdAt,
       })),
     });
   }
 );
 
-// POST /api/organizations/[slug]/websites/[websiteId]/products
+// POST /api/organizations/[slug]/websites/[websiteId]/queries
 export const POST = withUserAuth(
   async (req: NextRequest, context: RouteContext) => {
     const user = (req as typeof req & { user: { id: string } }).user;
@@ -107,7 +108,7 @@ export const POST = withUserAuth(
     }
 
     const body = await req.json();
-    const validation = createProductSchema.safeParse(body);
+    const validation = createSearchQuerySchema.safeParse(body);
 
     if (!validation.success) {
       return NextResponse.json(
@@ -116,7 +117,7 @@ export const POST = withUserAuth(
       );
     }
 
-    const product = await prisma.product.create({
+    const searchQuery = await prisma.searchQuery.create({
       data: {
         websiteId,
         ...validation.data,
@@ -124,19 +125,25 @@ export const POST = withUserAuth(
       },
     });
 
-    // Schedule SERP analysis for this product
+    // Schedule SERP analysis for this search query
     await prisma.analysisJob.create({
       data: {
         websiteId,
         type: "serp_analysis",
-        payload: { productId: product.id, queries: validation.data.keywords },
+        payload: {
+          searchQueryId: searchQuery.id,
+          query: validation.data.query,
+        },
         priority: 5,
       },
     });
 
-    return NextResponse.json({ success: true, data: product }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: searchQuery },
+      { status: 201 }
+    );
   }
 );
 
-// We also export a handler for individual products
-export { updateProductSchema };
+// We also export a handler for individual search queries
+export { updateSearchQuerySchema };

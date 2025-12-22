@@ -33,7 +33,7 @@ import {
 interface AISuggestionsBlockProps {
   orgSlug: string;
   websiteId: string;
-  productId: string;
+  queryId: string;
 }
 
 interface SEOSuggestion {
@@ -96,7 +96,7 @@ const priorityLabels: Record<string, string> = {
 export function AISuggestionsBlock({
   orgSlug,
   websiteId,
-  productId,
+  queryId,
 }: AISuggestionsBlockProps) {
   const [loading, setLoading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -109,7 +109,7 @@ export function AISuggestionsBlock({
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/seo-suggestions`
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/seo-suggestions`
       );
       const json = await res.json();
 
@@ -134,7 +134,7 @@ export function AISuggestionsBlock({
     } finally {
       setLoading(false);
     }
-  }, [orgSlug, websiteId, productId]);
+  }, [orgSlug, websiteId, queryId]);
 
   useEffect(() => {
     fetchExistingSuggestions();
@@ -144,7 +144,7 @@ export function AISuggestionsBlock({
     setGenerating(true);
     try {
       const res = await fetch(
-        `/api/organizations/${orgSlug}/websites/${websiteId}/products/${productId}/seo-suggestions`,
+        `/api/organizations/${orgSlug}/websites/${websiteId}/queries/${queryId}/seo-suggestions`,
         { method: "POST" }
       );
       const json = await res.json();

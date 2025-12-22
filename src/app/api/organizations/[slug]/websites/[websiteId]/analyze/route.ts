@@ -58,7 +58,7 @@ export const POST = withUserAuth(
       // Run analysis in the background (don't wait for it)
       // In production with serverless, this would be better handled by a queue
       // But for now, we'll run it directly
-      analysis.runInitialAnalysis(websiteId).catch((error) => {
+      analysis.runInitialAnalysis(websiteId).catch((error: unknown) => {
         console.error(`[API] Analysis failed for ${websiteId}:`, error);
       });
 

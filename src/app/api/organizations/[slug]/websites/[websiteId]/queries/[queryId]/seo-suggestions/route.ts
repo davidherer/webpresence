@@ -4,7 +4,7 @@ import { withUserAuth } from "@/lib/api/middleware";
 import { Mistral } from "@mistralai/mistralai";
 
 interface RouteContext {
-  params: Promise<{ slug: string; websiteId: string; productId: string }>;
+  params: Promise<{ slug: string; websiteId: string; queryId: string }>;
 }
 
 interface AuthRequest extends Request {
@@ -16,81 +16,14 @@ const MODEL_LARGE = "mistral-large-latest";
 
 // French stopwords to filter out
 const FRENCH_STOPWORDS = new Set([
-  "le",
-  "la",
-  "les",
-  "de",
-  "du",
-  "des",
-  "un",
-  "une",
-  "et",
-  "en",
-  "à",
-  "au",
-  "aux",
-  "ce",
-  "ces",
-  "cette",
-  "pour",
-  "par",
-  "sur",
-  "avec",
-  "dans",
-  "qui",
-  "que",
-  "quoi",
-  "dont",
-  "où",
-  "son",
-  "sa",
-  "ses",
-  "leur",
-  "leurs",
-  "nous",
-  "vous",
-  "ils",
-  "elles",
-  "est",
-  "sont",
-  "être",
-  "avoir",
-  "fait",
-  "faire",
-  "plus",
-  "moins",
-  "très",
-  "bien",
-  "tout",
-  "tous",
-  "toute",
-  "toutes",
-  "même",
-  "aussi",
-  "comme",
-  "mais",
-  "ou",
-  "donc",
-  "car",
-  "ni",
-  "si",
-  "pas",
-  "ne",
-  "sans",
-  "sous",
-  "entre",
-  "vers",
-  "chez",
-  "après",
-  "avant",
-  "depuis",
-  "pendant",
-  "selon",
-  "contre",
-  "malgré",
-  "grâce",
-  "votre",
-  "notre",
+  "le", "la", "les", "de", "du", "des", "un", "une", "et", "en", "à", "au",
+  "aux", "ce", "ces", "cette", "pour", "par", "sur", "avec", "dans", "qui",
+  "que", "quoi", "dont", "où", "son", "sa", "ses", "leur", "leurs", "nous",
+  "vous", "ils", "elles", "est", "sont", "être", "avoir", "fait", "faire",
+  "plus", "moins", "très", "bien", "tout", "tous", "toute", "toutes", "même",
+  "aussi", "comme", "mais", "ou", "donc", "car", "ni", "si", "pas", "ne",
+  "sans", "sous", "entre", "vers", "chez", "après", "avant", "depuis",
+  "pendant", "selon", "contre", "malgré", "grâce", "votre", "notre",
 ]);
 
 function extractKeywords(text: string | null): string[] {
@@ -102,12 +35,12 @@ function extractKeywords(text: string | null): string[] {
     .filter((word) => word.length > 2 && !FRENCH_STOPWORDS.has(word));
 }
 
-// Helper to check product access
-async function checkProductAccess(
+// Helper to check search query access
+async function checkSearchQueryAccess(
   userId: string,
   slug: string,
   websiteId: string,
-  productId: string
+  queryId: string
 ) {
   const membership = await prisma.organizationMember.findFirst({
     where: {
@@ -120,16 +53,16 @@ async function checkProductAccess(
     return null;
   }
 
-  const product = await prisma.product.findFirst({
+  const searchQuery = await prisma.searchQuery.findFirst({
     where: {
-      id: productId,
+      id: queryId,
       websiteId,
       website: { organizationId: membership.organizationId },
     },
     include: { website: true },
   });
 
-  return product;
+  return searchQuery;
 }
 
 interface SEOSuggestion {
@@ -157,39 +90,26 @@ interface AIResponse {
 }
 
 /**
- * POST /api/organizations/:slug/websites/:websiteId/products/:productId/seo-suggestions
+ * POST /api/organizations/:slug/websites/:websiteId/queries/:queryId/seo-suggestions
  * Generate AI-powered SEO suggestions based on comparative analysis
  */
 export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(user.id, slug, websiteId, queryId);
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
   // Get client's page analysis
-  let clientPageAnalysis = null;
-  if (product.sourceUrl) {
-    clientPageAnalysis = await prisma.pageAnalysis.findFirst({
-      where: {
-        websiteId,
-        url: product.sourceUrl,
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  if (!clientPageAnalysis) {
-    clientPageAnalysis = await prisma.pageAnalysis.findFirst({
-      where: { websiteId },
-      orderBy: { createdAt: "desc" },
-    });
-  }
+  const clientPageAnalysis = await prisma.pageAnalysis.findFirst({
+    where: { websiteId },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Get competitors with their page analyses
   const competitors = await prisma.competitor.findMany({
@@ -204,11 +124,12 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Prepare data for AI analysis
   const clientData = {
-    url: product.sourceUrl || product.website.url,
-    name: product.name,
-    description: product.description,
-    keywords: product.keywords,
-    title: clientPageAnalysis?.title || null,
+    url: searchQuery.website.url,
+    title: searchQuery.title,
+    description: searchQuery.description,
+    query: searchQuery.query,
+    competitionLevel: searchQuery.competitionLevel,
+    pageTitle: clientPageAnalysis?.title || null,
     metaDescription: clientPageAnalysis?.metaDescription || null,
     headings: clientPageAnalysis?.headings as {
       h1?: string[];
@@ -257,7 +178,7 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   const clientKeywordsSet = new Set([
     ...clientData.extractedKeywords.fromTitle,
     ...clientData.extractedKeywords.fromDescription,
-    ...clientData.keywords,
+    searchQuery.query,
   ]);
 
   const missingKeywords = [...allCompetitorKeywords].filter(
@@ -269,12 +190,14 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
 
 ## DONNÉES DU CLIENT
 
-**Produit/Service:** ${clientData.name}
-**URL actuelle:** ${clientData.url}
-**Title actuel:** ${clientData.title || "NON DÉFINI"}
+**Requête de recherche ciblée:** ${clientData.query}
+**Titre de la requête:** ${clientData.title}
+**Description de l'intention:** ${clientData.description || "NON DÉFINIE"}
+**Niveau de concurrence:** ${clientData.competitionLevel === "HIGH" ? "Forte (requête courte/générique)" : "Faible (longue traîne)"}
+**URL:** ${clientData.url}
+**Title actuel:** ${clientData.pageTitle || "NON DÉFINI"}
 **Meta Description actuelle:** ${clientData.metaDescription || "NON DÉFINIE"}
 **Headings actuels:** ${JSON.stringify(clientData.headings) || "NON ANALYSÉS"}
-**Mots-clés ciblés:** ${clientData.keywords.join(", ")}
 **Mots-clés extraits du Title:** ${
     clientData.extractedKeywords.fromTitle.join(", ") || "Aucun"
   }
@@ -303,7 +226,9 @@ ${missingKeywords.slice(0, 20).join(", ")}
 
 ## INSTRUCTIONS
 
-Génère des suggestions SEO précises et actionnables. Pour chaque suggestion:
+Génère des suggestions SEO précises et actionnables pour améliorer le positionnement sur la requête "${clientData.query}".
+
+Pour chaque suggestion:
 1. Indique le type: "title", "description", "url", "headings", "new_page", "content", ou "keyword"
 2. Indique la priorité: "high", "medium", ou "low"
 3. Donne un titre court et clair
@@ -312,7 +237,7 @@ Génère des suggestions SEO précises et actionnables. Pour chaque suggestion:
 6. Explique le raisonnement SEO derrière cette suggestion
 
 Propose au minimum:
-- 1 suggestion pour optimiser le Title (avec proposition concrète)
+- 1 suggestion pour optimiser le Title (avec proposition concrète incluant "${clientData.query}")
 - 1 suggestion pour optimiser la Meta Description (avec proposition concrète)
 - 1-2 suggestions pour améliorer/réorganiser les Headings
 - 1-2 idées de nouvelles pages à créer basées sur les mots-clés des concurrents
@@ -356,16 +281,16 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure:
 
     const aiResponse: AIResponse = JSON.parse(content);
 
-    // Delete existing suggestions for this product before creating new ones
+    // Delete existing suggestions for this search query before creating new ones
     await prisma.aISuggestion.deleteMany({
-      where: { productId },
+      where: { searchQueryId: queryId },
     });
 
     // Store the suggestions in the database
     for (const suggestion of aiResponse.suggestions) {
       await prisma.aISuggestion.create({
         data: {
-          productId,
+          searchQueryId: queryId,
           type: suggestion.type,
           title: suggestion.title,
           content: `${suggestion.description}\n\n**Raisonnement:** ${
@@ -393,7 +318,7 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure:
     // Store global analysis as a special suggestion
     await prisma.aISuggestion.create({
       data: {
-        productId,
+        searchQueryId: queryId,
         type: "global_analysis",
         title: "Analyse globale",
         content: aiResponse.globalAnalysis,
@@ -405,7 +330,7 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure:
     // Store quick wins as a special suggestion
     await prisma.aISuggestion.create({
       data: {
-        productId,
+        searchQueryId: queryId,
         type: "quick_wins",
         title: "Quick Wins - Actions rapides",
         content: JSON.stringify(aiResponse.quickWins),
@@ -417,7 +342,7 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure:
     // Store long term strategy as a special suggestion
     await prisma.aISuggestion.create({
       data: {
-        productId,
+        searchQueryId: queryId,
         type: "long_term",
         title: "Stratégie long terme",
         content: JSON.stringify(aiResponse.longTermStrategy),
@@ -446,23 +371,23 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure:
 });
 
 /**
- * GET /api/organizations/:slug/websites/:websiteId/products/:productId/seo-suggestions
- * Get existing SEO suggestions for this product
+ * GET /api/organizations/:slug/websites/:websiteId/queries/:queryId/seo-suggestions
+ * Get existing SEO suggestions for this search query
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
-  const { slug, websiteId, productId } = await params;
+  const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  if (!product) {
+  const searchQuery = await checkSearchQueryAccess(user.id, slug, websiteId, queryId);
+  if (!searchQuery) {
     return NextResponse.json(
-      { success: false, error: "Product not found" },
+      { success: false, error: "Search query not found" },
       { status: 404 }
     );
   }
 
   const allSuggestions = await prisma.aISuggestion.findMany({
-    where: { productId },
+    where: { searchQueryId: queryId },
     orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
   });
 
