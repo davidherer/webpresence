@@ -102,11 +102,13 @@ INSTRUCTIONS:
    - La requête exacte (1-6 mots-clés, en français si le projet est francophone)
    - Une description de l'intention de recherche
    - Des tags pour catégoriser (type de produit, service, audience, etc.)
-   - Le niveau de concurrence: "HIGH" (générique) ou "LOW" (longue traîne)
+   - Le niveau de concurrence: UNIQUEMENT "HIGH" ou "LOW" (pas d'autre valeur)
    - Un score de confiance (0.5-1.0)
 
 4. Donne un résumé de la stratégie SEO recommandée
 5. Liste 3-5 recommandations pour ce projet
+
+IMPORTANT: competitionLevel doit être EXACTEMENT "HIGH" ou "LOW", aucune autre valeur n'est acceptée.
 
 RÉPONDS UNIQUEMENT EN JSON:
 {
@@ -150,13 +152,17 @@ RÉPONDS UNIQUEMENT EN JSON:
           });
 
           if (!existing) {
+            // Normalize competitionLevel to only HIGH or LOW
+            const normalizedCompetitionLevel: "HIGH" | "LOW" =
+              sq.competitionLevel === "LOW" ? "LOW" : "HIGH";
+
             const created = await tx.searchQuery.create({
               data: {
                 websiteId,
                 query: sq.query,
                 description: sq.description,
                 tags: sq.tags,
-                competitionLevel: sq.competitionLevel,
+                competitionLevel: normalizedCompetitionLevel,
                 confidence: sq.confidence,
               },
             });
