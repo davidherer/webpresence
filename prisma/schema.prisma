@@ -17,8 +17,9 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  sessions     UserSession[]
-  authCodes    UserAuthCode[]
+  sessions      UserSession[]
+  authCodes     UserAuthCode[]
+  organizations OrganizationMember[]
 }
 
 model UserSession {
@@ -103,4 +104,261 @@ model AdminAuditLog {
 
   @@index([adminId])
   @@index([createdAt])
+}
+
+// ==========================================
+// ORGANIZATION & MULTI-USER MANAGEMENT
+// ==========================================
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Analysis frequency settings (in hours)
+  serpFrequencyHours       Int @default(24)   // Daily by default
+  competitorFrequencyHours Int @default(168)  // Weekly by default (7*24)
+  aiReportFrequencyHours   Int @default(720)  // Monthly by default (30*24)
+
+  members  OrganizationMember[]
+  websites Website[]
+}
+
+model OrganizationMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           String   @default("member") // owner, admin, member
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+// ==========================================
+// WEBSITE MANAGEMENT
+// ==========================================
+
+model Website {
+  id             String   @id @default(cuid())
+  organizationId String
+  url            String
+  name           String
+  status         String   @default("pending") // pending, analyzing, active, error
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Cached sitemap data
+  sitemapUrl       String?
+  lastSitemapFetch DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  products     Product[]
+  competitors  Competitor[]
+  pageAnalyses PageAnalysis[]
+  aiReports    AIReport[]
+  analysisJobs AnalysisJob[]
+
+  @@unique([organizationId, url])
+  @@index([organizationId])
+  @@index([status])
+}
+
+// ==========================================
+// PRODUCTS & SERVICES (Identified by AI)
+// ==========================================
+
+model Product {
+  id          String   @id @default(cuid())
+  websiteId   String
+  name        String
+  description String?
+  keywords    String[] // Main keywords associated with this product/service
+  sourceUrl   String?  // URL where this product was identified
+  confidence  Float    @default(0) // AI confidence score 0-1
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  serpResults   SerpResult[]
+  aiSuggestions AISuggestion[]
+
+  @@index([websiteId])
+  @@index([isActive])
+}
+
+// ==========================================
+// COMPETITOR TRACKING
+// ==========================================
+
+model Competitor {
+  id          String   @id @default(cuid())
+  websiteId   String
+  url         String
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  serpResults   SerpResult[]
+  pageAnalyses  CompetitorPageAnalysis[]
+
+  @@unique([websiteId, url])
+  @@index([websiteId])
+  @@index([isActive])
+}
+
+// ==========================================
+// SERP ANALYSIS & TRACKING
+// ==========================================
+
+model SerpResult {
+  id           String   @id @default(cuid())
+  productId    String?
+  competitorId String?
+  query        String   // Search query used
+  position     Int?     // Position in SERP (null if not found)
+  url          String?  // URL that appeared in SERP
+  title        String?
+  snippet      String?
+  searchEngine String   @default("google")
+  country      String   @default("FR")
+  device       String   @default("desktop") // desktop, mobile
+  createdAt    DateTime @default(now())
+
+  // Raw SERP data stored in Vercel Blob
+  rawDataBlobUrl String?
+
+  product    Product?    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  competitor Competitor? @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([competitorId])
+  @@index([query])
+  @@index([createdAt])
+}
+
+// ==========================================
+// PAGE ANALYSIS (Scraped Content)
+// ==========================================
+
+model PageAnalysis {
+  id        String   @id @default(cuid())
+  websiteId String
+  url       String
+  title     String?
+  metaDescription String?
+  headings  Json?    // { h1: [], h2: [], h3: [] }
+  keywords  Json?    // Extracted keywords with frequency
+  wordCount Int?
+  createdAt DateTime @default(now())
+
+  // Full HTML content stored in Vercel Blob
+  htmlBlobUrl String?
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([url])
+  @@index([createdAt])
+}
+
+model CompetitorPageAnalysis {
+  id           String   @id @default(cuid())
+  competitorId String
+  url          String
+  title        String?
+  metaDescription String?
+  headings     Json?
+  keywords     Json?
+  wordCount    Int?
+  createdAt    DateTime @default(now())
+
+  htmlBlobUrl String?
+
+  competitor Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+
+  @@index([competitorId])
+  @@index([url])
+  @@index([createdAt])
+}
+
+// ==========================================
+// AI REPORTS & SUGGESTIONS
+// ==========================================
+
+model AIReport {
+  id        String   @id @default(cuid())
+  websiteId String
+  type      String   // periodic_recap, competitor_analysis, initial_analysis
+  title     String
+  content   String   @db.Text
+  metadata  Json?    // Additional structured data
+  createdAt DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AISuggestion {
+  id        String   @id @default(cuid())
+  productId String
+  type      String   // content, keyword, technical, backlink
+  title     String
+  content   String   @db.Text
+  priority  Int      @default(0) // Higher = more important
+  status    String   @default("pending") // pending, accepted, dismissed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+}
+
+// ==========================================
+// BACKGROUND JOBS & SCHEDULING
+// ==========================================
+
+model AnalysisJob {
+  id         String    @id @default(cuid())
+  websiteId  String
+  type       String    // sitemap_fetch, page_scrape, serp_analysis, ai_report
+  status     String    @default("pending") // pending, running, completed, failed
+  priority   Int       @default(0)
+  payload    Json?     // Job-specific data
+  result     Json?     // Job result data
+  error      String?
+  attempts   Int       @default(0)
+  maxAttempts Int      @default(3)
+  scheduledAt DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([status])
+  @@index([type])
+  @@index([scheduledAt])
+  @@index([priority])
 }
