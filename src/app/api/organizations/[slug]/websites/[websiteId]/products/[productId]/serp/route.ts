@@ -142,8 +142,11 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   console.log(`[SERP POST] Params: slug=${slug}, websiteId=${websiteId}`);
 
   const product = await checkProductAccess(user.id, slug, websiteId, productId);
-  console.log(`[SERP POST] Product access check:`, product ? `found: ${product.name}` : "NOT FOUND");
-  
+  console.log(
+    `[SERP POST] Product access check:`,
+    product ? `found: ${product.name}` : "NOT FOUND"
+  );
+
   if (!product) {
     console.log(`[SERP POST] 404 - Product not found`);
     return NextResponse.json(
@@ -156,7 +159,7 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   let queries = product.keywords.slice(0, 5);
   let forceCancel = false;
   console.log(`[SERP POST] Default keywords:`, queries);
-  
+
   try {
     const body = await req.json();
     console.log(`[SERP POST] Request body:`, body);
@@ -188,10 +191,12 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   if (pendingJobs.length > 0) {
     if (forceCancel) {
       // Cancel all pending jobs
-      console.log(`[SERP POST] Force cancelling ${pendingJobs.length} pending job(s)...`);
+      console.log(
+        `[SERP POST] Force cancelling ${pendingJobs.length} pending job(s)...`
+      );
       await prisma.analysisJob.updateMany({
         where: {
-          id: { in: pendingJobs.map(j => j.id) },
+          id: { in: pendingJobs.map((j) => j.id) },
         },
         data: {
           status: "cancelled",
@@ -201,16 +206,19 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
       console.log(`[SERP POST] Jobs cancelled successfully`);
     } else {
       const pendingJob = pendingJobs[0];
-      console.log(`[SERP POST] 409 - Job already in progress: ${pendingJob.id}, status: ${pendingJob.status}`);
+      console.log(
+        `[SERP POST] 409 - Job already in progress: ${pendingJob.id}, status: ${pendingJob.status}`
+      );
       return NextResponse.json(
-        { 
-          success: false, 
-          error: "SERP analysis already in progress. Use force=true to cancel and restart.",
+        {
+          success: false,
+          error:
+            "SERP analysis already in progress. Use force=true to cancel and restart.",
           existingJob: {
             id: pendingJob.id,
             status: pendingJob.status,
             createdAt: pendingJob.createdAt,
-          }
+          },
         },
         { status: 409 }
       );
@@ -242,10 +250,15 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
     console.log(`[SERP POST] DEV mode - running SERP analysis immediately...`);
     runSerpAnalysis(websiteId, productId, queries)
       .then(() => {
-        console.log(`[SERP POST] SERP analysis completed for product ${productId}`);
+        console.log(
+          `[SERP POST] SERP analysis completed for product ${productId}`
+        );
       })
       .catch((error) => {
-        console.error(`[SERP POST] SERP analysis failed for product ${productId}:`, error);
+        console.error(
+          `[SERP POST] SERP analysis failed for product ${productId}:`,
+          error
+        );
       });
   }
 

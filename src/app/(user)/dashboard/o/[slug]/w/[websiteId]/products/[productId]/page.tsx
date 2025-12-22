@@ -8,6 +8,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus, ExternalLink } from "lucide
 import { SerpChart } from "./_components/SerpChart";
 import { CompetitorsList } from "./_components/CompetitorsList";
 import { SuggestionsList } from "./_components/SuggestionsList";
+import { KeywordsManager } from "./_components/KeywordsManager";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; productId: string }>;
@@ -109,24 +110,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Keywords */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Mots-clés surveillés</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {product.keywords.map((keyword, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary"
-                  >
-                    {keyword}
-                  </span>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Keywords - Client Component for editing */}
+          <KeywordsManager
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+            initialKeywords={product.keywords}
+          />
 
           {/* SERP Chart - Client Component */}
           <SerpChart

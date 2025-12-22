@@ -21,9 +21,19 @@ async function processJob(
   websiteId: string,
   payload: JobPayload
 ): Promise<JobResult> {
+  console.log(`[JobQueue processJob] Starting job ${jobId} of type ${type}`);
+  console.log(`[JobQueue processJob] Payload:`, payload);
+
   switch (type) {
     case "initial_analysis":
+      console.log(
+        `[JobQueue processJob] Running initial analysis for website ${websiteId}`
+      );
       const initialResult = await analysis.runInitialAnalysis(websiteId);
+      console.log(`[JobQueue processJob] Initial analysis result:`, {
+        success: initialResult.success,
+        error: initialResult.error,
+      });
       return {
         success: initialResult.success,
         data: initialResult,
@@ -31,10 +41,18 @@ async function processJob(
       };
 
     case "sitemap_fetch":
+      console.log(
+        `[JobQueue processJob] Sitemap fetch (handled as part of initial analysis)`
+      );
       // Handled as part of initial analysis for now
       return { success: true };
 
     case "page_scrape":
+      console.log(
+        `[JobQueue processJob] Page scrape with ${
+          payload.urls?.length || 0
+        } URLs`
+      );
       if (payload.urls && payload.urls.length > 0) {
         // TODO: Implement page scraping
         return { success: true };
@@ -42,17 +60,30 @@ async function processJob(
       return { success: false, error: "No URLs provided" };
 
     case "serp_analysis":
+      console.log(
+        `[JobQueue processJob] SERP analysis - productId: ${
+          payload.productId
+        }, queries count: ${payload.queries?.length || 0}`
+      );
       if (payload.productId && payload.queries) {
+        console.log(`[JobQueue processJob] Calling serp.runSerpAnalysis...`);
         const serpResult = await serp.runSerpAnalysis(
           websiteId,
           payload.productId,
           payload.queries as string[]
         );
+        console.log(`[JobQueue processJob] SERP analysis completed`);
         return { success: true, data: serpResult };
       }
+      console.log(
+        `[JobQueue processJob] SERP analysis failed - missing productId or queries`
+      );
       return { success: false, error: "Missing productId or queries" };
 
     case "ai_report":
+      console.log(
+        `[JobQueue processJob] AI report - type: ${payload.reportType}`
+      );
       if (payload.reportType) {
         // Generate AI report based on type
         const website = await prisma.website.findUnique({
@@ -64,10 +95,14 @@ async function processJob(
         });
 
         if (!website) {
+          console.log(`[JobQueue processJob] Website ${websiteId} not found`);
           return { success: false, error: "Website not found" };
         }
 
         if (payload.reportType === "periodic_recap") {
+          console.log(
+            `[JobQueue processJob] Generating periodic recap for ${website.name}`
+          );
           // Get SERP data for the period
           const periodDays = 30; // Default to 30 days
           const since = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
@@ -114,6 +149,9 @@ async function processJob(
             })
           );
 
+          console.log(
+            `[JobQueue processJob] Calling Mistral AI for report generation...`
+          );
           const report = await mistral.generatePeriodicRecap(
             website.name,
             productsData,
@@ -131,12 +169,16 @@ async function processJob(
             },
           });
 
+          console.log(
+            `[JobQueue processJob] Periodic recap generated successfully`
+          );
           return { success: true, data: report };
         }
       }
       return { success: false, error: "Missing report type" };
 
     default:
+      console.log(`[JobQueue processJob] Unknown job type: ${type}`);
       return { success: false, error: `Unknown job type: ${type}` };
   }
 }
@@ -150,6 +192,8 @@ export async function processJobQueue(): Promise<{
   succeeded: number;
   failed: number;
 }> {
+  console.log("[JobQueue] ===== Starting job queue processing =====");
+
   // Get pending jobs, ordered by priority and schedule time
   const pendingJobs = await prisma.analysisJob.findMany({
     where: {
@@ -161,12 +205,37 @@ export async function processJobQueue(): Promise<{
     take: MAX_CONCURRENT_JOBS,
   });
 
+  console.log(`[JobQueue] Found ${pendingJobs.length} pending jobs to process`);
+
+  if (pendingJobs.length === 0) {
+    console.log("[JobQueue] No pending jobs, exiting");
+    return { processed: 0, succeeded: 0, failed: 0 };
+  }
+
+  console.log(
+    "[JobQueue] Jobs details:",
+    pendingJobs.map((j) => ({
+      id: j.id,
+      type: j.type,
+      priority: j.priority,
+      attempts: j.attempts,
+      websiteId: j.websiteId,
+    }))
+  );
+
   let succeeded = 0;
   let failed = 0;
 
   for (const job of pendingJobs) {
+    console.log(
+      `[JobQueue] Processing job ${job.id} (type: ${job.type}, attempt: ${
+        job.attempts + 1
+      }/${job.maxAttempts})`
+    );
+
     try {
       // Mark as running
+      console.log(`[JobQueue] Marking job ${job.id} as running...`);
       await prisma.analysisJob.update({
         where: { id: job.id },
         data: {
@@ -175,6 +244,11 @@ export async function processJobQueue(): Promise<{
           attempts: job.attempts + 1,
         },
       });
+
+      console.log(
+        `[JobQueue] Executing job ${job.id} with payload:`,
+        job.payload
+      );
 
       // Process with timeout
       const result = await Promise.race([
@@ -189,6 +263,11 @@ export async function processJobQueue(): Promise<{
         ),
       ]);
 
+      console.log(`[JobQueue] Job ${job.id} completed with result:`, {
+        success: result.success,
+        error: result.error,
+      });
+
       // Update job status
       await prisma.analysisJob.update({
         where: { id: job.id },
@@ -201,15 +280,27 @@ export async function processJobQueue(): Promise<{
       });
 
       if (result.success) {
+        console.log(`[JobQueue] ✅ Job ${job.id} succeeded`);
         succeeded++;
       } else {
+        console.log(`[JobQueue] ❌ Job ${job.id} failed: ${result.error}`);
         failed++;
       }
     } catch (error) {
-      console.error(`[JobQueue] Error processing job ${job.id}:`, error);
+      console.error(`[JobQueue] ❌ Error processing job ${job.id}:`, error);
+      console.error(
+        `[JobQueue] Error details:`,
+        error instanceof Error ? error.stack : error
+      );
 
       // Mark as failed (might retry if under max attempts)
       const shouldRetry = job.attempts + 1 < job.maxAttempts;
+
+      console.log(
+        `[JobQueue] Job ${job.id} will ${
+          shouldRetry ? "be retried" : "NOT be retried"
+        }`
+      );
 
       await prisma.analysisJob.update({
         where: { id: job.id },
@@ -228,11 +319,16 @@ export async function processJobQueue(): Promise<{
     }
   }
 
-  return {
+  const summary = {
     processed: pendingJobs.length,
     succeeded,
     failed,
   };
+
+  console.log("[JobQueue] ===== Job processing complete =====");
+  console.log("[JobQueue] Summary:", summary);
+
+  return summary;
 }
 
 /**
