@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withUserAuth } from "@/lib/api/middleware";
 
+// Disable caching for this route
+export const dynamic = "force-dynamic";
+
 interface RouteContext {
   params: Promise<{ slug: string; websiteId: string; competitorId: string }>;
 }
@@ -79,7 +82,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       id: true,
       serpResults: {
         orderBy: { createdAt: "desc" },
-        take: 1, // Most recent per product
+        take: 10, // Get more results per product to find all queries
         select: { query: true, position: true, rawDataBlobUrl: true },
       },
     },
@@ -88,6 +91,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   let better = 0; // Times we rank better than competitor
   let worse = 0; // Times competitor ranks better than us
   let total = 0; // Total comparisons
+  const seenQueries = new Set<string>(); // Track processed queries to avoid duplicates
 
   // Helper function to check if a SERP result domain matches the competitor
   // Prioritizes: 1) exact match, 2) result is subdomain of competitor, 3) competitor is subdomain of result
@@ -108,6 +112,9 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   // For each product, check the SERP blob for competitor position
   for (const product of products) {
     for (const serpResult of product.serpResults) {
+      // Skip if we've already processed this query
+      if (seenQueries.has(serpResult.query)) continue;
+
       if (!serpResult.rawDataBlobUrl) continue;
 
       try {
@@ -131,6 +138,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
         const theyArePresent = theirPosition !== null && theirPosition > 0;
 
         if (weArePresent || theyArePresent) {
+          seenQueries.add(serpResult.query); // Mark this query as processed
           total++;
 
           if (weArePresent && !theyArePresent) {

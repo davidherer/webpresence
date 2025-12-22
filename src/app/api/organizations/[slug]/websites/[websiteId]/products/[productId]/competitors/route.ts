@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { withUserAuth } from "@/lib/api/middleware";
 
+// Disable caching for this route
+export const dynamic = "force-dynamic";
+
 interface RouteContext {
   params: Promise<{ slug: string; websiteId: string; productId: string }>;
 }

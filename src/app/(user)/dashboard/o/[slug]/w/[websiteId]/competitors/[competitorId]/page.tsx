@@ -13,6 +13,9 @@ import {
   Calendar,
 } from "lucide-react";
 
+// Disable caching for this page
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; competitorId: string }>;
 }
