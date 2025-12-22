@@ -281,6 +281,62 @@ function generateSlug(name: string): string {
     .replace(/^-|-$/g, "");
 }
 
+function generateTags(query: string, industryKeywords: string[]): string[] {
+  const tags: string[] = [];
+
+  // Ajouter des tags basés sur l'industrie
+  const industryTag =
+    industryKeywords[Math.floor(Math.random() * industryKeywords.length)];
+  if (industryTag) tags.push(industryTag);
+
+  // Ajouter des tags basés sur le type de requête
+  const queryLower = query.toLowerCase();
+  if (
+    queryLower.includes("prix") ||
+    queryLower.includes("pas cher") ||
+    queryLower.includes("comparatif")
+  ) {
+    tags.push("prix");
+  }
+  if (queryLower.includes("avis") || queryLower.includes("meilleur")) {
+    tags.push("avis");
+  }
+  if (
+    queryLower.includes("guide") ||
+    queryLower.includes("comment") ||
+    queryLower.includes("tutoriel")
+  ) {
+    tags.push("guide");
+  }
+  if (
+    queryLower.includes("paris") ||
+    queryLower.includes("lyon") ||
+    queryLower.includes("marseille") ||
+    queryLower.includes("local")
+  ) {
+    tags.push("local");
+  }
+  if (
+    queryLower.includes("2024") ||
+    queryLower.includes("2025") ||
+    queryLower.includes("tendance")
+  ) {
+    tags.push("actualité");
+  }
+
+  // Ajouter un tag de catégorie basé sur les mots clés
+  const words = query.split(" ");
+  if (words.length > 0) {
+    const mainWord = words[0].toLowerCase();
+    if (!tags.includes(mainWord) && mainWord.length > 3) {
+      tags.push(mainWord);
+    }
+  }
+
+  // Limiter à 5 tags maximum
+  return [...new Set(tags)].slice(0, 5);
+}
+
 function generateKeywords(
   baseKeywords: string[],
   productName: string
@@ -600,7 +656,7 @@ async function seed() {
     console.log(
       `  🔍 Création de ${CONFIG.SEARCH_QUERIES_PER_WEBSITE} requêtes de recherche...`
     );
-    const searchQueries: { id: string; title: string; query: string }[] = [];
+    const searchQueries: { id: string; query: string; tags: string[] }[] = [];
 
     for (let i = 0; i < CONFIG.SEARCH_QUERIES_PER_WEBSITE; i++) {
       // Utiliser les requêtes prédéfinies puis générer des variations
@@ -615,11 +671,8 @@ async function seed() {
               ]
             }`;
 
-      // Générer un titre descriptif à partir de la requête
-      const title = queryText
-        .split(" ")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
+      // Générer des tags pour grouper les requêtes
+      const tags = generateTags(queryText, industry.keywords);
 
       // Déterminer le niveau de concurrence (requêtes courtes = HIGH, longues = LOW)
       const competitionLevel =
@@ -628,16 +681,16 @@ async function seed() {
       const searchQuery = await prisma.searchQuery.create({
         data: {
           websiteId: website.id,
-          title: title,
           description: `Requête ciblant les utilisateurs recherchant "${queryText}". Intention: informationnelle/transactionnelle.`,
           query: queryText,
+          tags: tags,
           competitionLevel: competitionLevel,
           confidence: randomFloat(0.7, 0.99),
           isActive: Math.random() > 0.1,
         },
       });
 
-      searchQueries.push({ id: searchQuery.id, title, query: queryText });
+      searchQueries.push({ id: searchQuery.id, query: queryText, tags });
       totalSearchQueries++;
     }
 
@@ -730,10 +783,10 @@ async function seed() {
           position: Math.random() > 0.1 ? position : null, // 10% non trouvé
           url:
             position <= 10
-              ? `https://www.${industry.domain}/${generateSlug(sq.title)}`
+              ? `https://www.${industry.domain}/${generateSlug(sq.query)}`
               : null,
-          title: position <= 10 ? generatePageTitle(sq.title) : null,
-          snippet: position <= 10 ? generateMetaDescription(sq.title) : null,
+          title: position <= 10 ? generatePageTitle(sq.query) : null,
+          snippet: position <= 10 ? generateMetaDescription(sq.query) : null,
           searchEngine,
           country,
           device,
@@ -797,9 +850,9 @@ async function seed() {
             competitorId: competitor.id,
             query: sq.query,
             position: Math.random() > 0.05 ? position : null, // 5% non trouvé
-            url: `${competitor.url}/${generateSlug(sq.title)}`,
-            title: `${sq.title} - ${competitor.name}`,
-            snippet: `Découvrez ${sq.title} chez ${competitor.name}. Large sélection disponible.`,
+            url: `${competitor.url}/${generateSlug(sq.query)}`,
+            title: `${sq.query} - ${competitor.name}`,
+            snippet: `Découvrez ${sq.query} chez ${competitor.name}. Large sélection disponible.`,
             searchEngine: randomElement(SEARCH_ENGINES),
             country: randomElement(COUNTRIES),
             device: randomElement(DEVICES),
@@ -833,11 +886,11 @@ async function seed() {
       const sq = searchQueries[i % searchQueries.length];
       pageAnalysesBatch.push({
         websiteId: website.id,
-        url: `https://www.${industry.domain}/${generateSlug(sq.title)}`,
-        title: generatePageTitle(sq.title),
-        metaDescription: generateMetaDescription(sq.title),
-        headings: generateHeadings(sq.title),
-        keywords: generateKeywordsJson(sq.title, industry.keywords),
+        url: `https://www.${industry.domain}/${generateSlug(sq.query)}`,
+        title: generatePageTitle(sq.query),
+        metaDescription: generateMetaDescription(sq.query),
+        headings: generateHeadings(sq.query),
+        keywords: generateKeywordsJson(sq.query, industry.keywords),
         wordCount: randomInt(500, 3000),
         createdAt: randomDate(CONFIG.SERP_HISTORY_DAYS, 0),
       });
@@ -855,11 +908,11 @@ async function seed() {
         const sq = randomElement(searchQueries);
         competitorPagesBatch.push({
           competitorId: competitor.id,
-          url: `${competitor.url}/${generateSlug(sq.title)}`,
-          title: `${sq.title} | ${competitor.name}`,
-          metaDescription: `${sq.title} disponible chez ${competitor.name}. Livraison rapide et prix bas.`,
-          headings: generateHeadings(sq.title),
-          keywords: generateKeywordsJson(sq.title, industry.keywords),
+          url: `${competitor.url}/${generateSlug(sq.query)}`,
+          title: `${sq.query} | ${competitor.name}`,
+          metaDescription: `${sq.query} disponible chez ${competitor.name}. Livraison rapide et prix bas.`,
+          headings: generateHeadings(sq.query),
+          keywords: generateKeywordsJson(sq.query, industry.keywords),
           wordCount: randomInt(400, 2500),
           createdAt: randomDate(CONFIG.SERP_HISTORY_DAYS, 0),
         });
@@ -908,7 +961,7 @@ async function seed() {
     for (const sq of searchQueries) {
       for (let i = 0; i < CONFIG.SUGGESTIONS_PER_QUERY; i++) {
         const type = randomElement(SUGGESTION_TYPES);
-        const suggestion = generateAISuggestion(type, sq.title);
+        const suggestion = generateAISuggestion(type, sq.query);
 
         suggestionsBatch.push({
           searchQueryId: sq.id,
