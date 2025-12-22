@@ -41,13 +41,13 @@ async function getCompetitorSerpComparisons(
   const competitorDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
 
   // Get all products for this website with their latest SERP results
+  // Don't filter by position to include cases where we are absent
   const products = await prisma.product.findMany({
     where: { websiteId, isActive: true },
     select: {
       id: true,
       name: true,
       serpResults: {
-        where: { position: { not: null } },
         orderBy: { createdAt: "desc" },
         take: 10, // Get more results per product to find all queries
         select: { query: true, position: true, rawDataBlobUrl: true },
@@ -63,7 +63,7 @@ async function getCompetitorSerpComparisons(
       // Skip if we've already processed this query
       if (seenQueries.has(serpResult.query)) continue;
       
-      if (!serpResult.rawDataBlobUrl || serpResult.position === null) continue;
+      if (!serpResult.rawDataBlobUrl) continue;
 
       try {
         const response = await fetch(serpResult.rawDataBlobUrl);
@@ -72,21 +72,40 @@ async function getCompetitorSerpComparisons(
         const serpData = await response.json();
         if (!serpData.results || !Array.isArray(serpData.results)) continue;
 
-        // Find competitor in results
+        // Find competitor in results - match exact domain or subdomain relationships
         const competitorResult = serpData.results.find((r: { domain: string; position: number }) => {
-          const resultDomain = r.domain.replace(/^www\./, "");
-          return resultDomain === competitorDomain || resultDomain.endsWith(`.${competitorDomain}`);
+          const resultDomain = r.domain.replace(/^www\./, "").toLowerCase();
+          const compDomain = competitorDomain.toLowerCase();
+          return (
+            resultDomain === compDomain ||
+            resultDomain.endsWith(`.${compDomain}`) ||
+            compDomain.endsWith(`.${resultDomain}`)
+          );
         });
 
-        if (competitorResult) {
+        const ourPosition = serpResult.position !== null && serpResult.position > 0 ? serpResult.position : 0;
+        const theirPosition = competitorResult?.position ?? 0;
+
+        // Include if at least one of us is present
+        if (ourPosition > 0 || theirPosition > 0) {
           seenQueries.add(serpResult.query);
+          
+          let weAreBetter: boolean;
+          if (ourPosition > 0 && theirPosition === 0) {
+            weAreBetter = true; // We are present, they are not
+          } else if (ourPosition === 0 && theirPosition > 0) {
+            weAreBetter = false; // They are present, we are not
+          } else {
+            weAreBetter = ourPosition < theirPosition; // Both present, lower is better
+          }
+          
           comparisons.push({
             query: serpResult.query,
             productName: product.name,
             productId: product.id,
-            ourPosition: serpResult.position,
-            theirPosition: competitorResult.position,
-            weAreBetter: serpResult.position < competitorResult.position,
+            ourPosition,
+            theirPosition,
+            weAreBetter,
           });
         }
       } catch {
@@ -251,9 +270,19 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
 
               {/* Rows */}
               {comparisons.map((comparison, index) => {
-                const diff = comparison.theirPosition - comparison.ourPosition;
-                const isWinning = diff > 0;
-                const isLosing = diff < 0;
+                const isWinning = comparison.weAreBetter;
+                const isLosing = !comparison.weAreBetter && (comparison.ourPosition !== comparison.theirPosition);
+                
+                // Calculate display diff
+                let diffDisplay: string;
+                if (comparison.ourPosition === 0 && comparison.theirPosition > 0) {
+                  diffDisplay = "Absent";
+                } else if (comparison.ourPosition > 0 && comparison.theirPosition === 0) {
+                  diffDisplay = "Eux absents";
+                } else {
+                  const diff = comparison.theirPosition - comparison.ourPosition;
+                  diffDisplay = diff > 0 ? `+${diff}` : diff < 0 ? `${diff}` : "=";
+                }
 
                 return (
                   <div
@@ -274,23 +303,23 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
                         {comparison.productName}
                       </Link>
                     </div>
-                    <div className="col-span-1 text-center font-bold">
-                      #{comparison.ourPosition}
+                    <div className={`col-span-1 text-center font-bold ${comparison.ourPosition === 0 ? 'text-orange-500' : ''}`}>
+                      {comparison.ourPosition > 0 ? `#${comparison.ourPosition}` : 'Absent'}
                     </div>
-                    <div className="col-span-1 text-center font-bold">
-                      #{comparison.theirPosition}
+                    <div className={`col-span-1 text-center font-bold ${comparison.theirPosition === 0 ? 'text-orange-500' : ''}`}>
+                      {comparison.theirPosition > 0 ? `#${comparison.theirPosition}` : 'Absent'}
                     </div>
                     <div className="col-span-2 flex items-center justify-center gap-1">
                       {isWinning && (
                         <>
                           <TrendingUp className="w-4 h-4 text-green-600" />
-                          <span className="text-green-600 font-medium">+{diff}</span>
+                          <span className="text-green-600 font-medium text-xs">{diffDisplay}</span>
                         </>
                       )}
                       {isLosing && (
                         <>
                           <TrendingDown className="w-4 h-4 text-red-500" />
-                          <span className="text-red-500 font-medium">{diff}</span>
+                          <span className="text-red-500 font-medium text-xs">{diffDisplay}</span>
                         </>
                       )}
                       {!isWinning && !isLosing && (

@@ -78,7 +78,6 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     select: {
       id: true,
       serpResults: {
-        where: { position: { not: null } },
         orderBy: { createdAt: "desc" },
         take: 1, // Most recent per product
         select: { query: true, position: true, rawDataBlobUrl: true },
@@ -89,6 +88,19 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   let better = 0; // Times we rank better than competitor
   let worse = 0; // Times competitor ranks better than us
   let total = 0; // Total comparisons
+
+  // Helper function to check if a SERP result domain matches the competitor
+  // Prioritizes: 1) exact match, 2) result is subdomain of competitor, 3) competitor is subdomain of result
+  function domainMatchesCompetitor(resultDomain: string, compDomain: string): boolean {
+    const resultLower = resultDomain.replace(/^www\./, "").toLowerCase();
+    const compLower = compDomain.toLowerCase();
+    
+    return (
+      resultLower === compLower ||
+      resultLower.endsWith(`.${compLower}`) ||
+      compLower.endsWith(`.${resultLower}`)
+    );
+  }
 
   // For each product, check the SERP blob for competitor position
   for (const product of products) {
@@ -104,13 +116,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
         // Find competitor in results
         const competitorResult = serpData.results.find(
-          (r: { domain: string }) => {
-            const resultDomain = r.domain.replace(/^www\./, "");
-            return (
-              resultDomain === competitorDomain ||
-              resultDomain.endsWith(`.${competitorDomain}`)
-            );
-          }
+          (r: { domain: string }) => domainMatchesCompetitor(r.domain, competitorDomain)
         );
 
         const ourPosition = serpResult.position;

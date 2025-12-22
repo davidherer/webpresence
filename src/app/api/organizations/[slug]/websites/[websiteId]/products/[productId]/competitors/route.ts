@@ -104,6 +104,38 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     competitorPositions[normalizedDomain] = {};
   }
 
+  // Helper function to find the best matching competitor for a domain
+  // Prioritizes: 1) exact match, 2) result is subdomain of competitor, 3) competitor is subdomain of result
+  function findBestMatchingCompetitor(resultDomain: string, competitors: typeof websiteCompetitors) {
+    const resultLower = resultDomain.toLowerCase();
+    
+    // First pass: exact match
+    for (const comp of competitors) {
+      const compDomain = new URL(comp.url).hostname.replace(/^www\./, "").toLowerCase();
+      if (resultLower === compDomain) {
+        return comp;
+      }
+    }
+    
+    // Second pass: result is a subdomain of competitor (e.g., result=agence.loxam.fr, competitor=loxam.fr)
+    for (const comp of competitors) {
+      const compDomain = new URL(comp.url).hostname.replace(/^www\./, "").toLowerCase();
+      if (resultLower.endsWith(`.${compDomain}`)) {
+        return comp;
+      }
+    }
+    
+    // Third pass: competitor is a subdomain of result (e.g., result=loxam.fr, competitor=agence.loxam.fr)
+    for (const comp of competitors) {
+      const compDomain = new URL(comp.url).hostname.replace(/^www\./, "").toLowerCase();
+      if (compDomain.endsWith(`.${resultLower}`)) {
+        return comp;
+      }
+    }
+    
+    return null;
+  }
+
   // Read SERP data from blobs and extract competitor positions
   for (const [query, serpResult] of uniqueQueries) {
     if (!serpResult.rawDataBlobUrl) continue;
@@ -115,24 +147,21 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       const serpData = await response.json();
       if (!serpData.results || !Array.isArray(serpData.results)) continue;
 
+      console.log(`[Competitors API] Query "${query}" - Found ${serpData.results.length} SERP results`);
+      console.log(`[Competitors API] SERP domains:`, serpData.results.map((r: SerpResultFromBlob) => r.domain));
+      console.log(`[Competitors API] Competitor domains we're looking for:`, websiteCompetitors.map(c => new URL(c.url).hostname.replace(/^www\./, "")));
+
       // Extract positions for each competitor
       for (const result of serpData.results as SerpResultFromBlob[]) {
         const normalizedResultDomain = result.domain.replace(/^www\./, "");
 
-        // Check if this domain matches any of our competitors
-        for (const comp of websiteCompetitors) {
-          const normalizedCompDomain = new URL(comp.url).hostname.replace(
-            /^www\./,
-            ""
-          );
-
-          if (
-            normalizedResultDomain === normalizedCompDomain ||
-            normalizedResultDomain.endsWith(`.${normalizedCompDomain}`)
-          ) {
-            competitorPositions[normalizedCompDomain][query] = result.position;
-            break;
-          }
+        // Find the best matching competitor (prioritizes exact match, then subdomain relationships)
+        const matchedComp = findBestMatchingCompetitor(normalizedResultDomain, websiteCompetitors);
+        
+        if (matchedComp) {
+          const normalizedCompDomain = new URL(matchedComp.url).hostname.replace(/^www\./, "");
+          console.log(`[Competitors API] ✅ MATCH: "${normalizedResultDomain}" matches competitor "${normalizedCompDomain}" for query "${query}" at position ${result.position}`);
+          competitorPositions[normalizedCompDomain][query] = result.position;
         }
       }
     } catch (error) {
