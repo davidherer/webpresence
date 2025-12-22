@@ -17,19 +17,37 @@ export async function runSerpAnalysis(
   productId: string,
   queries: string[]
 ): Promise<SerpAnalysisResult[]> {
+  console.log(`[SERP runSerpAnalysis] ===== Starting SERP analysis =====`);
+  console.log(`[SERP runSerpAnalysis] websiteId: ${websiteId}`);
+  console.log(`[SERP runSerpAnalysis] productId: ${productId}`);
+  console.log(
+    `[SERP runSerpAnalysis] queries: ${queries.length} queries`,
+    queries
+  );
+
   const website = await prisma.website.findUnique({ where: { id: websiteId } });
   const product = await prisma.product.findUnique({ where: { id: productId } });
 
   if (!website || !product) {
+    console.error(`[SERP runSerpAnalysis] ❌ Website or product not found`);
     throw new Error("Website or product not found");
   }
 
+  console.log(
+    `[SERP runSerpAnalysis] Website: ${website.name} (${website.url})`
+  );
+  console.log(`[SERP runSerpAnalysis] Product: ${product.name}`);
+
   const websiteDomain = new URL(website.url).hostname;
+  console.log(`[SERP runSerpAnalysis] Looking for domain: ${websiteDomain}`);
+
   const results: SerpAnalysisResult[] = [];
 
   for (const query of queries) {
     try {
-      console.log(`[SERP] Analyzing query: "${query}"`);
+      console.log(
+        `[SERP runSerpAnalysis] ===== Processing query: "${query}" =====`
+      );
 
       const serpResponse = await brightdata.searchSerp({
         query,
@@ -38,12 +56,18 @@ export async function runSerpAnalysis(
         numResults: 20,
       });
 
+      console.log(
+        `[SERP runSerpAnalysis] Received ${serpResponse.results.length} results from BrightData`
+      );
+
       // Store raw SERP data in blob
+      console.log(`[SERP runSerpAnalysis] Storing SERP data in blob...`);
       const blobResult = await storage.storeSerpData(
         websiteId,
         query,
         serpResponse
       );
+      console.log(`[SERP runSerpAnalysis] Blob stored at: ${blobResult.url}`);
 
       // Find our position
       const ourResult = serpResponse.results.find(
@@ -51,7 +75,13 @@ export async function runSerpAnalysis(
           r.domain === websiteDomain || r.domain.endsWith(`.${websiteDomain}`)
       );
 
+      console.log(
+        `[SERP runSerpAnalysis] Our position:`,
+        ourResult ? `#${ourResult.position} (${ourResult.url})` : "NOT FOUND"
+      );
+
       // Save SERP result for the product
+      console.log(`[SERP runSerpAnalysis] Saving SERP result to database...`);
       await prisma.serpResult.create({
         data: {
           productId,
@@ -66,6 +96,7 @@ export async function runSerpAnalysis(
           rawDataBlobUrl: blobResult.url,
         },
       });
+      console.log(`[SERP runSerpAnalysis] ✅ SERP result saved`);
 
       // Identify competitors from SERP
       const competitors = serpResponse.results
@@ -81,6 +112,10 @@ export async function runSerpAnalysis(
           domain: r.domain,
         }));
 
+      console.log(
+        `[SERP runSerpAnalysis] Found ${competitors.length} competitors`
+      );
+
       results.push({
         query,
         position: ourResult?.position || null,
@@ -90,12 +125,19 @@ export async function runSerpAnalysis(
 
       // Auto-add top competitors (if not already tracked)
       const topCompetitors = competitors.slice(0, 3);
+      console.log(
+        `[SERP runSerpAnalysis] Checking top ${topCompetitors.length} competitors...`
+      );
+
       for (const comp of topCompetitors) {
         const existing = await prisma.competitor.findFirst({
           where: { websiteId, url: { contains: comp.domain } },
         });
 
         if (!existing) {
+          console.log(
+            `[SERP runSerpAnalysis] Adding new competitor: ${comp.domain}`
+          );
           // Create competitor (will need manual validation)
           await prisma.competitor.create({
             data: {
@@ -105,14 +147,31 @@ export async function runSerpAnalysis(
               description: `Concurrent détecté sur "${query}"`,
             },
           });
+          console.log(`[SERP runSerpAnalysis] ✅ Competitor added`);
+        } else {
+          console.log(
+            `[SERP runSerpAnalysis] Competitor ${comp.domain} already exists`
+          );
         }
       }
+
+      console.log(`[SERP runSerpAnalysis] ✅ Query "${query}" completed`);
     } catch (error) {
-      console.error(`[SERP] Error for query "${query}":`, error);
+      console.error(
+        `[SERP runSerpAnalysis] ❌ Error for query "${query}":`,
+        error
+      );
+      console.error(
+        `[SERP runSerpAnalysis] Error stack:`,
+        error instanceof Error ? error.stack : "N/A"
+      );
       // Continue with other queries
     }
   }
 
+  console.log(
+    `[SERP runSerpAnalysis] ===== Analysis complete - ${results.length}/${queries.length} queries successful =====`
+  );
   return results;
 }
 

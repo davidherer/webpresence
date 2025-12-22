@@ -10,6 +10,8 @@ import type {
 
 const BRIGHTDATA_API_KEY = process.env.BRIGHTDATA_API_KEY;
 const BRIGHTDATA_ZONE = process.env.BRIGHTDATA_ZONE || "isp";
+const BRIGHTDATA_USERNAME = process.env.BRIGHTDATA_USERNAME;
+const BRIGHTDATA_PASSWORD = process.env.BRIGHTDATA_PASSWORD;
 const USE_BRIGHTDATA = !!BRIGHTDATA_API_KEY;
 
 if (!USE_BRIGHTDATA && process.env.NODE_ENV !== "development") {
@@ -25,10 +27,14 @@ if (!USE_BRIGHTDATA && process.env.NODE_ENV !== "development") {
 class BrightDataClient {
   private apiKey: string | undefined;
   private zone: string;
+  private username: string | undefined;
+  private password: string | undefined;
 
   constructor() {
     this.apiKey = BRIGHTDATA_API_KEY;
     this.zone = BRIGHTDATA_ZONE;
+    this.username = BRIGHTDATA_USERNAME;
+    this.password = BRIGHTDATA_PASSWORD;
   }
 
   private getProxyConfig() {
@@ -118,42 +124,206 @@ class BrightDataClient {
   }
 
   /**
-   * Fetch SERP results for a query
+   * Fetch SERP results for a query using BrightData SERP API
    */
   async searchSerp(options: SerpOptions): Promise<SerpResponse> {
     const {
       query,
       country = "fr",
       language = "fr",
-      // device is available in options but not used in URL building for now
+      device = "desktop",
       numResults = 10,
     } = options;
 
+    console.log(
+      `[BrightData searchSerp] Starting SERP search for query: "${query}"`
+    );
+    console.log(`[BrightData searchSerp] Options:`, {
+      country,
+      language,
+      device,
+      numResults,
+    });
+    console.log(
+      `[BrightData searchSerp] Using BrightData API: ${USE_BRIGHTDATA}`
+    );
+
     try {
-      // Build Google search URL
-      const searchUrl = this.buildGoogleSearchUrl(
-        query,
-        country,
-        language,
-        numResults
-      );
+      // Use BrightData SERP API if available
+      if (USE_BRIGHTDATA && this.apiKey) {
+        console.log(`[BrightData searchSerp] Using SERP API`);
 
-      // Scrape Google results page
-      const result = await this.scrapePage({ url: searchUrl });
+        // BrightData SERP API endpoint
+        const apiUrl = "https://api.brightdata.com/request";
 
-      // Parse SERP results from HTML
-      const results = this.parseSerpResults(result.html);
+        // Use SERP API zone
+        const serpZone =
+          process.env.BRIGHTDATA_SERP_ZONE || "serp_api_google_1";
 
-      return {
-        query,
-        results,
-        totalResults: results.length,
-        timestamp: new Date(),
-      };
+        // Build Google search URL with all parameters
+        const countryCode = country.toUpperCase();
+        const searchUrl =
+          `https://www.google.${country}/search` +
+          `?q=${encodeURIComponent(query)}` +
+          `&gl=${countryCode}` +
+          `&hl=${language}`;
+
+        const requestBody = {
+          zone: serpZone,
+          url: searchUrl,
+          format: "raw",
+          data_format: "parsed_light",
+        };
+
+        console.log(`[BrightData searchSerp] API URL: ${apiUrl}`);
+        console.log(`[BrightData searchSerp] SERP Zone: ${serpZone}`);
+        console.log(`[BrightData searchSerp] Search URL: ${searchUrl}`);
+        console.log(`[BrightData searchSerp] Request body:`, requestBody);
+
+        const response = await fetch(apiUrl, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        });
+
+        console.log(
+          `[BrightData searchSerp] API response status: ${response.status}`
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(
+            `[BrightData searchSerp] API error response:`,
+            errorText
+          );
+          throw new Error(
+            `BrightData SERP API error: ${response.status} - ${errorText}`
+          );
+        }
+
+        const data = await response.json();
+        console.log(`[BrightData searchSerp] API response received`);
+        console.log(
+          `[BrightData searchSerp] Response JSON:`,
+          JSON.stringify(data, null, 2)
+        );
+        console.log(
+          `[BrightData searchSerp] Response data keys:`,
+          Object.keys(data)
+        );
+
+        // parsed_light format returns { organic: [...] }
+        const results: SerpResultItem[] = [];
+
+        if (data.organic && Array.isArray(data.organic)) {
+          for (const item of data.organic) {
+            const url = item.link || item.url || "";
+            let domain = "";
+            try {
+              domain = new URL(url).hostname.replace("www.", "");
+            } catch {
+              domain = url;
+            }
+
+            results.push({
+              position: item.global_rank || results.length + 1,
+              url,
+              domain,
+              title: item.title || "",
+              description: item.description || "",
+            });
+          }
+        } else {
+          console.error(
+            `[BrightData searchSerp] Unexpected API response format - no organic results:`,
+            data
+          );
+          throw new Error(
+            "BrightData SERP API: No organic results in response"
+          );
+        }
+
+        console.log(
+          `[BrightData searchSerp] ✅ Found ${results.length} results for "${query}"`
+        );
+        if (results.length > 0) {
+          console.log(
+            `[BrightData searchSerp] Top 3 results:`,
+            results.slice(0, 3).map((r) => ({
+              position: r.position,
+              domain: r.domain,
+              title: r.title?.substring(0, 50) + "...",
+            }))
+          );
+        }
+
+        return {
+          query,
+          results,
+          totalResults: results.length,
+          timestamp: new Date(),
+        };
+      }
+
+      // Fallback for dev without API key
+      return this.searchSerpFallback(query, country, language, numResults);
     } catch (error) {
-      console.error(`[BrightData] SERP error for "${query}":`, error);
+      console.error(
+        `[BrightData searchSerp] ❌ SERP error for "${query}":`,
+        error
+      );
+      console.error(
+        `[BrightData searchSerp] Error stack:`,
+        error instanceof Error ? error.stack : "N/A"
+      );
       throw error;
     }
+  }
+
+  /**
+   * Fallback method for SERP search (direct scraping)
+   */
+  private async searchSerpFallback(
+    query: string,
+    country: string,
+    language: string,
+    numResults: number
+  ): Promise<SerpResponse> {
+    console.log(
+      `[BrightData searchSerpFallback] Using fallback direct Google search (dev mode)`
+    );
+
+    const searchUrl = this.buildGoogleSearchUrl(
+      query,
+      country,
+      language,
+      numResults
+    );
+
+    console.log(`[BrightData searchSerpFallback] Search URL: ${searchUrl}`);
+
+    const result = await this.scrapePage({ url: searchUrl });
+
+    console.log(
+      `[BrightData searchSerpFallback] Page scraped, HTML length: ${result.html.length} chars`
+    );
+
+    // Parse SERP results from HTML
+    const results = this.parseSerpResults(result.html);
+
+    console.log(
+      `[BrightData searchSerpFallback] ✅ Found ${results.length} results for "${query}" (fallback mode)`
+    );
+
+    return {
+      query,
+      results,
+      totalResults: results.length,
+      timestamp: new Date(),
+    };
   }
 
   private buildGoogleSearchUrl(
