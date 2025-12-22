@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
 import { CompetitorScore } from "./_components/CompetitorScore";
+import { OnboardingBanner } from "./_components/OnboardingBanner";
+import { GenerateQueriesDialog } from "./_components/GenerateQueriesDialog";
 import {
   ArrowLeft,
   BarChart3,
@@ -20,6 +23,7 @@ import {
   ExternalLink,
   RefreshCw,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 interface PageProps {
@@ -92,6 +96,20 @@ export default function WebsitePage({ params }: PageProps) {
   const [data, setData] = useState<WebsiteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+
+  // Reload data function
+  const reloadData = async () => {
+    try {
+      const response = await fetch(`/api/organizations/${slug}/websites/${websiteId}/dashboard`);
+      if (response.ok) {
+        const websiteData = await response.json();
+        setData(websiteData);
+      }
+    } catch (err) {
+      console.error("Failed to reload data:", err);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -168,6 +186,14 @@ export default function WebsitePage({ params }: PageProps) {
               Voir le site
             </a>
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowGenerateDialog(true)}
+          >
+            <Sparkles className="w-4 h-4 mr-2" />
+            Générer des requêtes
+          </Button>
           <AnalyzeButton
             orgSlug={slug}
             websiteId={websiteId}
@@ -176,8 +202,18 @@ export default function WebsitePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Status banner for pending/analyzing websites */}
-      {website.status !== "active" && (
+      {/* Onboarding banner for draft websites */}
+      {website.status === "draft" && (
+        <OnboardingBanner
+          orgSlug={slug}
+          websiteId={websiteId}
+          websiteUrl={website.url}
+          onDismiss={reloadData}
+        />
+      )}
+
+      {/* Status banner for analyzing websites */}
+      {website.status === "analyzing" && (
         <Card className="mb-8 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
           <CardContent className="flex items-center gap-4 py-4">
             <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
@@ -190,6 +226,18 @@ export default function WebsitePage({ params }: PageProps) {
           </CardContent>
         </Card>
       )}
+
+      {/* Generate Queries Dialog */}
+      <GenerateQueriesDialog
+        orgSlug={slug}
+        websiteId={websiteId}
+        isOpen={showGenerateDialog}
+        onClose={() => setShowGenerateDialog(false)}
+        onSuccess={() => {
+          setShowGenerateDialog(false);
+          reloadData();
+        }}
+      />
 
       {/* Quick stats */}
       <div className="grid gap-4 md:grid-cols-4 mb-8">

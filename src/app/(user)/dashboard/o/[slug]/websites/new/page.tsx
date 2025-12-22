@@ -123,15 +123,14 @@ export default function NewWebsitePage({ params }: PageProps) {
             <div className="bg-muted/50 rounded-lg p-4 text-sm">
               <p className="font-medium mb-2">Que va-t-il se passer ?</p>
               <ul className="space-y-1 text-muted-foreground">
-                <li>• Analyse du sitemap de votre site</li>
-                <li>• Extraction des pages clés</li>
-                <li>• Identification automatique de vos produits/services par IA</li>
-                <li>• Premier rapport d&apos;analyse</li>
+                <li>• Vous pourrez analyser votre site existant</li>
+                <li>• Ou générer des requêtes depuis une idée de projet</li>
+                <li>• L&apos;analyse n&apos;est pas lancée automatiquement</li>
               </ul>
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Ajout en cours..." : "Ajouter et analyser"}
+              {loading ? "Ajout en cours..." : "Ajouter le site"}
             </Button>
           </form>
         </CardContent>

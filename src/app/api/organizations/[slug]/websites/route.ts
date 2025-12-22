@@ -123,36 +123,19 @@ export const POST = withUserAuth(
       );
     }
 
-    // Create website
+    // Create website - status "draft" means no analysis has been started yet
     const website = await prisma.website.create({
       data: {
         organizationId: access.organizationId,
         url: normalizedUrl,
         name,
-        status: "pending",
+        status: "draft",
       },
     });
 
-    // Schedule initial analysis job
-    await prisma.analysisJob.create({
-      data: {
-        websiteId: website.id,
-        type: "initial_analysis",
-        status: "pending",
-        priority: 10, // High priority for new websites
-      },
-    });
-
-    // In development, trigger analysis immediately without waiting for cron
-    if (process.env.NODE_ENV === "development") {
-      const analysis = await import("@/lib/analysis/initial");
-      analysis.runInitialAnalysis(website.id).catch((error) => {
-        console.error(
-          `[DEV] Failed to auto-start analysis for website ${website.id}:`,
-          error
-        );
-      });
-    }
+    // Don't start analysis automatically - user will choose to either:
+    // 1. Start website analysis (if they have a real website)
+    // 2. Generate queries from a project idea (if planning stage)
 
     return NextResponse.json(
       {
