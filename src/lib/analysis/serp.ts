@@ -39,7 +39,9 @@ export async function runSerpAnalysis(
   console.log(`[SERP runSerpAnalysis] Product: ${product.name}`);
 
   const websiteDomain = new URL(website.url).hostname;
-  console.log(`[SERP runSerpAnalysis] Looking for domain: ${websiteDomain}`);
+  // Normalize domain (remove www.) for comparison
+  const ourDomain = websiteDomain.replace(/^www\./, "");
+  console.log(`[SERP runSerpAnalysis] Looking for domain: ${websiteDomain} (normalized: ${ourDomain})`);
 
   const results: SerpAnalysisResult[] = [];
 
@@ -59,6 +61,9 @@ export async function runSerpAnalysis(
       console.log(
         `[SERP runSerpAnalysis] Received ${serpResponse.results.length} results from BrightData`
       );
+      
+      // Log all domains for debugging
+      console.log(`[SERP runSerpAnalysis] All domains in results:`, serpResponse.results.map(r => r.domain));
 
       // Store raw SERP data in blob
       console.log(`[SERP runSerpAnalysis] Storing SERP data in blob...`);
@@ -69,11 +74,14 @@ export async function runSerpAnalysis(
       );
       console.log(`[SERP runSerpAnalysis] Blob stored at: ${blobResult.url}`);
 
-      // Find our position
-      const ourResult = serpResponse.results.find(
-        (r) =>
-          r.domain === websiteDomain || r.domain.endsWith(`.${websiteDomain}`)
-      );
+      // Find our position (normalize domains for comparison)
+      const ourResult = serpResponse.results.find((r) => {
+        const resultDomain = r.domain.replace(/^www\./, "");
+        return (
+          resultDomain === ourDomain ||
+          resultDomain.endsWith(`.${ourDomain}`)
+        );
+      });
 
       console.log(
         `[SERP runSerpAnalysis] Our position:`,
@@ -100,11 +108,14 @@ export async function runSerpAnalysis(
 
       // Identify competitors from SERP
       const competitors = serpResponse.results
-        .filter(
-          (r) =>
-            r.domain !== websiteDomain &&
-            !r.domain.endsWith(`.${websiteDomain}`)
-        )
+        .filter((r) => {
+          const resultDomain = r.domain.replace(/^www\./, "");
+          // Exclude if it's our domain (exact match or subdomain)
+          const isOurDomain =
+            resultDomain === ourDomain ||
+            resultDomain.endsWith(`.${ourDomain}`);
+          return !isOurDomain;
+        })
         .slice(0, 10)
         .map((r) => ({
           url: r.url,
@@ -173,6 +184,220 @@ export async function runSerpAnalysis(
     `[SERP runSerpAnalysis] ===== Analysis complete - ${results.length}/${queries.length} queries successful =====`
   );
   return results;
+}
+
+/**
+ * Re-analyze stored SERP data without calling BrightData
+ * This is useful to re-extract competitors after fixing domain matching
+ * Also updates our own positions if they were missed
+ */
+export async function reanalyzeSerpFromBlob(
+  websiteId: string,
+  productId: string
+): Promise<{
+  reanalyzed: number;
+  positionsUpdated: number;
+  competitorsFound: number;
+  competitorsAdded: number;
+}> {
+  console.log(`[SERP reanalyzeSerpFromBlob] Starting re-analysis...`);
+
+  const website = await prisma.website.findUnique({ where: { id: websiteId } });
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+
+  if (!website || !product) {
+    throw new Error("Website or product not found");
+  }
+
+  const websiteDomain = new URL(website.url).hostname;
+  const normalizedWebsiteDomain = websiteDomain.replace(/^www\./, "");
+
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Website domain: ${normalizedWebsiteDomain}`
+  );
+
+  // Get all SERP results with blob URLs
+  const serpResults = await prisma.serpResult.findMany({
+    where: {
+      productId,
+      rawDataBlobUrl: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Found ${serpResults.length} SERP results to re-analyze`
+  );
+
+  let positionsUpdated = 0;
+  let competitorsFound = 0;
+  let competitorsAdded = 0;
+
+  // Process unique queries (take most recent for each)
+  const uniqueQueries = new Map<string, (typeof serpResults)[0]>();
+  for (const result of serpResults) {
+    if (!uniqueQueries.has(result.query)) {
+      uniqueQueries.set(result.query, result);
+    }
+  }
+
+  for (const [query, serpResult] of uniqueQueries) {
+    if (!serpResult.rawDataBlobUrl) continue;
+
+    try {
+      console.log(
+        `[SERP reanalyzeSerpFromBlob] Re-analyzing "${query}" from ${serpResult.rawDataBlobUrl}`
+      );
+
+      // Fetch stored SERP data from blob
+      const response = await fetch(serpResult.rawDataBlobUrl);
+      if (!response.ok) {
+        console.error(
+          `[SERP reanalyzeSerpFromBlob] Failed to fetch blob: ${response.status}`
+        );
+        continue;
+      }
+
+      const serpData = await response.json();
+
+      if (!serpData.results || !Array.isArray(serpData.results)) {
+        console.error(`[SERP reanalyzeSerpFromBlob] Invalid SERP data format`);
+        continue;
+      }
+
+      console.log(
+        `[SERP reanalyzeSerpFromBlob] Loaded ${serpData.results.length} results from blob`
+      );
+      console.log(
+        `[SERP reanalyzeSerpFromBlob] All domains:`,
+        serpData.results.map((r: { domain: string }) => r.domain)
+      );
+
+      // Find our position with normalized domain matching
+      const ourResult = serpData.results.find((r: { domain: string; position: number; url: string; title?: string }) => {
+        const normalizedResultDomain = r.domain.replace(/^www\./, "");
+        return (
+          normalizedResultDomain === normalizedWebsiteDomain ||
+          normalizedResultDomain.endsWith(`.${normalizedWebsiteDomain}`)
+        );
+      });
+
+      console.log(
+        `[SERP reanalyzeSerpFromBlob] Our position for "${query}":`,
+        ourResult ? `#${ourResult.position} (${ourResult.url})` : "NOT FOUND"
+      );
+      console.log(
+        `[SERP reanalyzeSerpFromBlob] Current DB position:`,
+        serpResult.position
+      );
+
+      // Update position if different
+      if (ourResult && (serpResult.position !== ourResult.position || !serpResult.url)) {
+        console.log(
+          `[SERP reanalyzeSerpFromBlob] Updating position from ${serpResult.position} to ${ourResult.position}`
+        );
+        await prisma.serpResult.update({
+          where: { id: serpResult.id },
+          data: {
+            position: ourResult.position,
+            url: ourResult.url,
+            title: ourResult.title || serpResult.title,
+          },
+        });
+        positionsUpdated++;
+      } else if (!ourResult && serpResult.position !== null) {
+        // We thought we had a position but actually don't
+        console.log(
+          `[SERP reanalyzeSerpFromBlob] Clearing incorrect position ${serpResult.position}`
+        );
+        await prisma.serpResult.update({
+          where: { id: serpResult.id },
+          data: {
+            position: null,
+            url: null,
+          },
+        });
+        positionsUpdated++;
+      }
+
+      // Re-identify competitors with improved filtering
+      const competitors = serpData.results.filter(
+        (r: { domain: string; position: number; url: string }) => {
+          const normalizedResultDomain = r.domain.replace(/^www\./, "");
+          const isOurDomain =
+            normalizedResultDomain === normalizedWebsiteDomain ||
+            normalizedResultDomain.endsWith(`.${normalizedWebsiteDomain}`);
+
+          if (isOurDomain) {
+            console.log(
+              `[SERP reanalyzeSerpFromBlob] Excluding our domain: ${r.domain}`
+            );
+          }
+          return !isOurDomain;
+        }
+      );
+
+      competitorsFound += competitors.length;
+
+      // Add top 3 competitors
+      const topCompetitors = competitors.slice(0, 3);
+      for (const comp of topCompetitors) {
+        const normalizedCompDomain = comp.domain.replace(/^www\./, "");
+
+        // Check if already exists
+        const existing = await prisma.competitor.findFirst({
+          where: {
+            websiteId,
+            OR: [
+              { url: { contains: normalizedCompDomain } },
+              { url: { contains: `www.${normalizedCompDomain}` } },
+            ],
+          },
+        });
+
+        if (!existing) {
+          console.log(
+            `[SERP reanalyzeSerpFromBlob] Adding new competitor: ${normalizedCompDomain} (position ${comp.position})`
+          );
+          await prisma.competitor.create({
+            data: {
+              websiteId,
+              url: `https://${comp.domain}`,
+              name: normalizedCompDomain,
+              description: `Concurrent détecté sur "${query}" (position ${comp.position})`,
+            },
+          });
+          competitorsAdded++;
+        }
+      }
+    } catch (error) {
+      console.error(
+        `[SERP reanalyzeSerpFromBlob] Error re-analyzing "${query}":`,
+        error
+      );
+    }
+  }
+
+  console.log(`[SERP reanalyzeSerpFromBlob] ===== Re-analysis complete =====`);
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Queries re-analyzed: ${uniqueQueries.size}`
+  );
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Positions updated: ${positionsUpdated}`
+  );
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Competitors found: ${competitorsFound}`
+  );
+  console.log(
+    `[SERP reanalyzeSerpFromBlob] Competitors added: ${competitorsAdded}`
+  );
+
+  return {
+    reanalyzed: uniqueQueries.size,
+    positionsUpdated,
+    competitorsFound,
+    competitorsAdded,
+  };
 }
 
 /**

@@ -10,6 +10,14 @@ interface AuthRequest extends Request {
   user: { id: string; email: string };
 }
 
+interface SerpResultFromBlob {
+  position: number;
+  url: string;
+  domain: string;
+  title: string;
+  description: string;
+}
+
 // Helper to check product access
 async function checkProductAccess(
   userId: string,
@@ -45,7 +53,7 @@ async function checkProductAccess(
  * Get competitors for this product based on SERP results (dynamic deduction)
  *
  * A competitor is identified when they appear in SERP results for the same keywords
- * as this product.
+ * as this product. We extract competitor positions from stored SERP blobs.
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   const { slug, websiteId, productId } = await params;
@@ -62,72 +70,90 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   // Get product's keywords
   const productKeywords = product.keywords;
 
-  // Get our SERP results for this product
+  // Get our SERP results for this product (with blob URLs)
   const ourSerpResults = await prisma.serpResult.findMany({
     where: { productId },
     orderBy: { createdAt: "desc" },
   });
 
-  // Get unique queries we've searched
-  const searchedQueries = [...new Set(ourSerpResults.map((r) => r.query))];
+  // Get unique queries we've searched (take most recent for each query)
+  const uniqueQueries = new Map<string, typeof ourSerpResults[0]>();
+  for (const result of ourSerpResults) {
+    if (!uniqueQueries.has(result.query)) {
+      uniqueQueries.set(result.query, result);
+    }
+  }
 
-  // Find competitors from the same website that have SERP results for similar keywords
+  // Get our latest position per keyword
+  const ourPositionsByKeyword: Record<string, number | null> = {};
+  for (const [query, result] of uniqueQueries) {
+    ourPositionsByKeyword[query] = result.position;
+  }
+
+  // Find competitors from the website
   const websiteCompetitors = await prisma.competitor.findMany({
-    where: { websiteId },
-    include: {
-      serpResults: {
-        where: {
-          query: { in: searchedQueries },
-        },
-        orderBy: { createdAt: "desc" },
-      },
-    },
+    where: { websiteId, isActive: true },
   });
+
+  // Build a map of competitor positions per keyword by reading from stored SERP blobs
+  const competitorPositions: Record<string, Record<string, number>> = {};
+  
+  // Initialize for each competitor
+  for (const comp of websiteCompetitors) {
+    const normalizedDomain = new URL(comp.url).hostname.replace(/^www\./, "");
+    competitorPositions[normalizedDomain] = {};
+  }
+
+  // Read SERP data from blobs and extract competitor positions
+  for (const [query, serpResult] of uniqueQueries) {
+    if (!serpResult.rawDataBlobUrl) continue;
+
+    try {
+      const response = await fetch(serpResult.rawDataBlobUrl);
+      if (!response.ok) continue;
+
+      const serpData = await response.json();
+      if (!serpData.results || !Array.isArray(serpData.results)) continue;
+
+      // Extract positions for each competitor
+      for (const result of serpData.results as SerpResultFromBlob[]) {
+        const normalizedResultDomain = result.domain.replace(/^www\./, "");
+        
+        // Check if this domain matches any of our competitors
+        for (const comp of websiteCompetitors) {
+          const normalizedCompDomain = new URL(comp.url).hostname.replace(/^www\./, "");
+          
+          if (normalizedResultDomain === normalizedCompDomain ||
+              normalizedResultDomain.endsWith(`.${normalizedCompDomain}`)) {
+            competitorPositions[normalizedCompDomain][query] = result.position;
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.error(`Error fetching SERP blob for "${query}":`, error);
+    }
+  }
 
   // Build competitor data with position comparison
   const competitorData = websiteCompetitors.map((competitor) => {
-    // Get latest position per keyword for this competitor
-    const positionsByKeyword: Record<
-      string,
-      { position: number; date: string }
-    > = {};
+    const normalizedDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
+    const positionsByKeyword = competitorPositions[normalizedDomain] || {};
+    
+    // Get keywords where both us and competitor have positions
+    const keywords = Object.keys(positionsByKeyword);
+    
+    const comparison = keywords
+      .filter(kw => ourPositionsByKeyword[kw] !== undefined && ourPositionsByKeyword[kw] !== null)
+      .map((kw) => ({
+        keyword: kw,
+        ourPosition: ourPositionsByKeyword[kw]!,
+        competitorPosition: positionsByKeyword[kw],
+        difference: ourPositionsByKeyword[kw]! - positionsByKeyword[kw],
+        weAreBetter: ourPositionsByKeyword[kw]! < positionsByKeyword[kw],
+      }));
 
-    for (const result of competitor.serpResults) {
-      if (result.position === null) continue;
-      if (
-        !positionsByKeyword[result.query] ||
-        new Date(result.createdAt) >
-          new Date(positionsByKeyword[result.query].date)
-      ) {
-        positionsByKeyword[result.query] = {
-          position: result.position,
-          date: result.createdAt.toISOString(),
-        };
-      }
-    }
-
-    // Get our latest position per keyword for comparison
-    const ourPositionsByKeyword: Record<string, number> = {};
-    for (const result of ourSerpResults) {
-      if (!ourPositionsByKeyword[result.query] && result.position !== null) {
-        ourPositionsByKeyword[result.query] = result.position;
-      }
-    }
-
-    // Calculate overlap and comparison
-    const sharedKeywords = Object.keys(positionsByKeyword).filter(
-      (kw) => ourPositionsByKeyword[kw] !== undefined
-    );
-
-    const comparison = sharedKeywords.map((kw) => ({
-      keyword: kw,
-      ourPosition: ourPositionsByKeyword[kw],
-      competitorPosition: positionsByKeyword[kw].position,
-      difference: ourPositionsByKeyword[kw] - positionsByKeyword[kw].position,
-      weAreBetter: ourPositionsByKeyword[kw] < positionsByKeyword[kw].position,
-    }));
-
-    // Average position difference
+    // Average position difference (negative = they are better)
     const avgDifference =
       comparison.length > 0
         ? comparison.reduce((sum, c) => sum + c.difference, 0) /
@@ -139,8 +165,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       name: competitor.name,
       url: competitor.url,
       description: competitor.description,
-      sharedKeywords: sharedKeywords.length,
-      totalKeywordsTracked: Object.keys(positionsByKeyword).length,
+      sharedKeywords: comparison.length,
+      totalKeywordsTracked: keywords.length,
       comparison,
       avgDifference,
       threat: avgDifference > 5 ? "low" : avgDifference > 0 ? "medium" : "high",
@@ -157,9 +183,6 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     return b.sharedKeywords - a.sharedKeywords;
   });
 
-  // TODO: In a future version, we could also find potential competitors from SERP results
-  // that aren't registered yet - domains that appear in top positions but we haven't added as competitors
-
   return NextResponse.json({
     success: true,
     data: {
@@ -171,7 +194,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
           .length,
         lowThreat: competitorData.filter((c) => c.threat === "low").length,
         ourKeywords: productKeywords,
-        searchedQueries,
+        searchedQueries: [...uniqueQueries.keys()],
       },
     },
   });
