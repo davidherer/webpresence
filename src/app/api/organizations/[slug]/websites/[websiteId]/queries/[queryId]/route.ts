@@ -12,9 +12,9 @@ interface AuthRequest extends Request {
 }
 
 const updateSearchQuerySchema = z.object({
-  title: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
   query: z.string().min(1).max(200).optional(),
+  tags: z.array(z.string().min(1).max(50)).max(10).optional(),
   competitionLevel: z.enum(["HIGH", "LOW"]).optional(),
   isActive: z.boolean().optional(),
 });
@@ -124,14 +124,14 @@ export const PATCH = withUserAuth<RouteContext>(async (req, { params }) => {
     );
   }
 
-  const { title, description, query, competitionLevel, isActive } =
+  const { description, query, tags, competitionLevel, isActive } =
     validation.data;
 
   // Build update data
   const updateData: Record<string, unknown> = {};
-  if (title !== undefined) updateData.title = title;
   if (description !== undefined) updateData.description = description;
   if (query !== undefined) updateData.query = query;
+  if (tags !== undefined) updateData.tags = tags;
   if (competitionLevel !== undefined)
     updateData.competitionLevel = competitionLevel;
   if (isActive !== undefined) updateData.isActive = isActive;
