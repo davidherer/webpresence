@@ -91,10 +91,13 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Helper function to check if a SERP result domain matches the competitor
   // Prioritizes: 1) exact match, 2) result is subdomain of competitor, 3) competitor is subdomain of result
-  function domainMatchesCompetitor(resultDomain: string, compDomain: string): boolean {
+  function domainMatchesCompetitor(
+    resultDomain: string,
+    compDomain: string
+  ): boolean {
     const resultLower = resultDomain.replace(/^www\./, "").toLowerCase();
     const compLower = compDomain.toLowerCase();
-    
+
     return (
       resultLower === compLower ||
       resultLower.endsWith(`.${compLower}`) ||
@@ -116,7 +119,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
         // Find competitor in results
         const competitorResult = serpData.results.find(
-          (r: { domain: string }) => domainMatchesCompetitor(r.domain, competitorDomain)
+          (r: { domain: string }) =>
+            domainMatchesCompetitor(r.domain, competitorDomain)
         );
 
         const ourPosition = serpResult.position;
