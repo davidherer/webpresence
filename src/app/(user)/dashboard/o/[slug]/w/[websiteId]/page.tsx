@@ -33,8 +33,8 @@ interface SerpResult {
 
 interface SearchQuery {
   id: string;
-  title: string;
   query: string;
+  description: string | null;
   competitionLevel: "HIGH" | "LOW";
   serpResults: SerpResult[];
   _count: {
@@ -253,11 +253,13 @@ export default function WebsitePage({ params }: PageProps) {
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardContent className="py-4">
                         <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{searchQuery.title}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {searchQuery.query}
-                            </p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{searchQuery.query}</p>
+                            {searchQuery.description && (
+                              <p className="text-sm text-muted-foreground truncate">
+                                {searchQuery.description}
+                              </p>
+                            )}
                           </div>
                           <div className="flex items-center gap-4">
                             {searchQuery._count.aiSuggestions > 0 && (

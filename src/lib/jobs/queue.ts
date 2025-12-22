@@ -119,7 +119,7 @@ async function processJob(
               });
 
               return {
-                name: searchQuery.title,
+                name: searchQuery.query,
                 keywords: [searchQuery.query],
                 currentPositions: currentResults.map((r) => ({
                   query: r.query,

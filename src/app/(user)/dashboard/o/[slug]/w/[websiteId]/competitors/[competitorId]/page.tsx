@@ -22,7 +22,6 @@ interface PageProps {
 
 interface SerpComparison {
   query: string;
-  queryTitle: string;
   queryId: string;
   ourPosition: number;
   theirPosition: number;
@@ -42,7 +41,7 @@ async function getCompetitorSerpComparisons(
     where: { websiteId, isActive: true },
     select: {
       id: true,
-      title: true,
+      query: true,
       serpResults: {
         orderBy: { createdAt: "desc" },
         take: 50, // Get more results to have multiple queries per search query
@@ -51,8 +50,8 @@ async function getCompetitorSerpComparisons(
     },
   });
 
-  // Build a map of our positions: query -> { position, queryTitle, queryId }
-  const ourPositions = new Map<string, { position: number | null; queryTitle: string; queryId: string }>();
+  // Build a map of our positions: query -> { position, queryId }
+  const ourPositions = new Map<string, { position: number | null; queryId: string }>();
   for (const searchQuery of searchQueries) {
     for (const result of searchQuery.serpResults) {
       const queryLower = result.query.toLowerCase();
@@ -60,7 +59,6 @@ async function getCompetitorSerpComparisons(
       if (!ourPositions.has(queryLower)) {
         ourPositions.set(queryLower, {
           position: result.position,
-          queryTitle: searchQuery.title,
           queryId: searchQuery.id,
         });
       }
@@ -111,7 +109,6 @@ async function getCompetitorSerpComparisons(
 
       comparisons.push({
         query: query,
-        queryTitle: ourData.queryTitle,
         queryId: ourData.queryId,
         ourPosition: ourPos ?? 0,
         theirPosition: theirPos ?? 0,
@@ -267,10 +264,9 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
             <div className="space-y-2">
               {/* Header */}
               <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs font-medium text-muted-foreground uppercase border-b">
-                <div className="col-span-5">Requête</div>
-                <div className="col-span-3">Produit</div>
-                <div className="col-span-1 text-center">Nous</div>
-                <div className="col-span-1 text-center">Eux</div>
+                <div className="col-span-6">Requête</div>
+                <div className="col-span-2 text-center">Nous</div>
+                <div className="col-span-2 text-center">Eux</div>
                 <div className="col-span-2 text-center">Statut</div>
               </div>
 
@@ -298,21 +294,19 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
                       isLosing ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/30"
                     }`}
                   >
-                    <div className="col-span-5 font-medium truncate" title={comparison.query}>
-                      {comparison.query}
-                    </div>
-                    <div className="col-span-3">
+                    <div className="col-span-6">
                       <Link
                         href={`/dashboard/o/${slug}/w/${websiteId}/queries/${comparison.queryId}`}
-                        className="text-sm text-blue-600 hover:underline truncate block"
+                        className="font-medium hover:underline text-blue-600 truncate block"
+                        title={comparison.query}
                       >
-                        {comparison.queryTitle}
+                        {comparison.query}
                       </Link>
                     </div>
-                    <div className={`col-span-1 text-center font-bold ${comparison.ourPosition === 0 ? 'text-orange-500' : ''}`}>
+                    <div className={`col-span-2 text-center font-bold ${comparison.ourPosition === 0 ? 'text-orange-500' : ''}`}>
                       {comparison.ourPosition > 0 ? `#${comparison.ourPosition}` : 'Absent'}
                     </div>
-                    <div className={`col-span-1 text-center font-bold ${comparison.theirPosition === 0 ? 'text-orange-500' : ''}`}>
+                    <div className={`col-span-2 text-center font-bold ${comparison.theirPosition === 0 ? 'text-orange-500' : ''}`}>
                       {comparison.theirPosition > 0 ? `#${comparison.theirPosition}` : 'Absent'}
                     </div>
                     <div className="col-span-2 flex items-center justify-center gap-1">

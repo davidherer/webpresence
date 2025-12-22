@@ -79,9 +79,9 @@ export interface SitemapEntry {
 // ==========================================
 
 export interface IdentifiedSearchQuery {
-  title: string;
   description: string;
   query: string;
+  tags: string[];
   competitionLevel: "HIGH" | "LOW";
   confidence: number;
 }

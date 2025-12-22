@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, Search, Zap, Mountain } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, Search, Zap, Mountain, Tag } from "lucide-react";
 import { SerpChart } from "./_components/SerpChart";
 import { CompetitorsList } from "./_components/CompetitorsList";
 import { SuggestionsList } from "./_components/SuggestionsList";
@@ -87,8 +87,11 @@ export default async function QueryDetailPage({ params }: PageProps) {
         </Link>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold">{searchQuery.title}</h1>
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
+              <span className="inline-flex items-center px-4 py-2 rounded-lg text-xl font-medium bg-primary/10 text-primary">
+                <Search className="w-5 h-5 mr-2" />
+                {searchQuery.query}
+              </span>
               {!searchQuery.isActive && (
                 <span className="text-sm font-normal text-muted-foreground bg-muted px-3 py-1 rounded">
                   Inactif
@@ -106,6 +109,16 @@ export default async function QueryDetailPage({ params }: PageProps) {
                 </span>
               )}
             </div>
+            {searchQuery.tags.length > 0 && (
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Tag className="w-4 h-4 text-muted-foreground" />
+                {searchQuery.tags.map((tag) => (
+                  <span key={tag} className="text-sm px-2 py-1 rounded-full bg-secondary text-secondary-foreground">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="text-muted-foreground">{searchQuery.description}</p>
           </div>
           {searchQuery.serpResults.length > 0 && (
@@ -129,23 +142,6 @@ export default async function QueryDetailPage({ params }: PageProps) {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Search Query Display */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="w-5 h-5" />
-                Requête de recherche
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <span className="inline-flex items-center px-4 py-2 rounded-lg text-lg font-medium bg-primary/10 text-primary">
-                  {searchQuery.query}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* SERP Chart - Client Component */}
           <SerpChart
             orgSlug={slug}

@@ -167,23 +167,22 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
     .map((r) => ({
       position: r.position!,
       url: searchQuery.website.url,
-      title: r.title || searchQuery.title,
+      title: r.title || searchQuery.query,
       snippet: r.snippet || "",
     }));
 
   // Build current page content (use first analysis or create from search query)
   const currentPage = pageContents[0] || {
     url: searchQuery.website.url,
-    title: searchQuery.title,
+    title: searchQuery.query,
     metaDescription: searchQuery.description || "",
-    headings: { h1: [searchQuery.title], h2: [], h3: [] },
+    headings: { h1: [searchQuery.query], h2: [], h3: [] },
     keywords: [{ keyword: searchQuery.query, frequency: 1 }],
   };
 
   // Generate suggestions using AI
   const aiSuggestions = await mistral.generateSEOSuggestions(
-    searchQuery.title,
-    searchQuery.query, // Single query string
+    searchQuery.query,
     currentPage,
     serpPerformance,
     competitorPages

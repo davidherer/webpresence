@@ -148,9 +148,9 @@ export async function runInitialAnalysis(
       const created = await prisma.searchQuery.create({
         data: {
           websiteId,
-          title: sq.title,
           description: sq.description,
           query: sq.query,
+          tags: sq.tags || [],
           competitionLevel: sq.competitionLevel,
           confidence: sq.confidence,
         },
@@ -300,9 +300,9 @@ function selectKeyPages(
 function formatInitialReport(
   aiResult: {
     searchQueries: Array<{
-      title: string;
       description: string;
       query: string;
+      tags: string[];
       competitionLevel: string;
     }>;
     summary: string;
@@ -313,11 +313,11 @@ function formatInitialReport(
   const queryList = aiResult.searchQueries
     .map(
       (sq, i) =>
-        `### ${i + 1}. ${sq.title}\n${sq.description}\n\n**Requête**: \`${
-          sq.query
-        }\` (${
-          sq.competitionLevel === "HIGH" ? "Forte concurrence" : "Longue traîne"
-        })`
+        `### ${i + 1}. ${sq.query}\n${sq.description}\n\n**Tags**: ${
+          sq.tags.length > 0 ? sq.tags.join(", ") : "Aucun"
+        } | **Concurrence**: ${
+          sq.competitionLevel === "HIGH" ? "Forte" : "Longue traîne"
+        }`
     )
     .join("\n\n");
 

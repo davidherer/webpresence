@@ -16,14 +16,81 @@ const MODEL_LARGE = "mistral-large-latest";
 
 // French stopwords to filter out
 const FRENCH_STOPWORDS = new Set([
-  "le", "la", "les", "de", "du", "des", "un", "une", "et", "en", "à", "au",
-  "aux", "ce", "ces", "cette", "pour", "par", "sur", "avec", "dans", "qui",
-  "que", "quoi", "dont", "où", "son", "sa", "ses", "leur", "leurs", "nous",
-  "vous", "ils", "elles", "est", "sont", "être", "avoir", "fait", "faire",
-  "plus", "moins", "très", "bien", "tout", "tous", "toute", "toutes", "même",
-  "aussi", "comme", "mais", "ou", "donc", "car", "ni", "si", "pas", "ne",
-  "sans", "sous", "entre", "vers", "chez", "après", "avant", "depuis",
-  "pendant", "selon", "contre", "malgré", "grâce", "votre", "notre",
+  "le",
+  "la",
+  "les",
+  "de",
+  "du",
+  "des",
+  "un",
+  "une",
+  "et",
+  "en",
+  "à",
+  "au",
+  "aux",
+  "ce",
+  "ces",
+  "cette",
+  "pour",
+  "par",
+  "sur",
+  "avec",
+  "dans",
+  "qui",
+  "que",
+  "quoi",
+  "dont",
+  "où",
+  "son",
+  "sa",
+  "ses",
+  "leur",
+  "leurs",
+  "nous",
+  "vous",
+  "ils",
+  "elles",
+  "est",
+  "sont",
+  "être",
+  "avoir",
+  "fait",
+  "faire",
+  "plus",
+  "moins",
+  "très",
+  "bien",
+  "tout",
+  "tous",
+  "toute",
+  "toutes",
+  "même",
+  "aussi",
+  "comme",
+  "mais",
+  "ou",
+  "donc",
+  "car",
+  "ni",
+  "si",
+  "pas",
+  "ne",
+  "sans",
+  "sous",
+  "entre",
+  "vers",
+  "chez",
+  "après",
+  "avant",
+  "depuis",
+  "pendant",
+  "selon",
+  "contre",
+  "malgré",
+  "grâce",
+  "votre",
+  "notre",
 ]);
 
 function extractKeywords(text: string | null): string[] {
@@ -97,7 +164,12 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const searchQuery = await checkSearchQueryAccess(user.id, slug, websiteId, queryId);
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
   if (!searchQuery) {
     return NextResponse.json(
       { success: false, error: "Search query not found" },
@@ -125,7 +197,6 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
   // Prepare data for AI analysis
   const clientData = {
     url: searchQuery.website.url,
-    title: searchQuery.title,
     description: searchQuery.description,
     query: searchQuery.query,
     competitionLevel: searchQuery.competitionLevel,
@@ -191,9 +262,12 @@ export const POST = withUserAuth<RouteContext>(async (req, { params }) => {
 ## DONNÉES DU CLIENT
 
 **Requête de recherche ciblée:** ${clientData.query}
-**Titre de la requête:** ${clientData.title}
 **Description de l'intention:** ${clientData.description || "NON DÉFINIE"}
-**Niveau de concurrence:** ${clientData.competitionLevel === "HIGH" ? "Forte (requête courte/générique)" : "Faible (longue traîne)"}
+**Niveau de concurrence:** ${
+    clientData.competitionLevel === "HIGH"
+      ? "Forte (requête courte/générique)"
+      : "Faible (longue traîne)"
+  }
 **URL:** ${clientData.url}
 **Title actuel:** ${clientData.pageTitle || "NON DÉFINI"}
 **Meta Description actuelle:** ${clientData.metaDescription || "NON DÉFINIE"}
@@ -226,7 +300,9 @@ ${missingKeywords.slice(0, 20).join(", ")}
 
 ## INSTRUCTIONS
 
-Génère des suggestions SEO précises et actionnables pour améliorer le positionnement sur la requête "${clientData.query}".
+Génère des suggestions SEO précises et actionnables pour améliorer le positionnement sur la requête "${
+    clientData.query
+  }".
 
 Pour chaque suggestion:
 1. Indique le type: "title", "description", "url", "headings", "new_page", "content", ou "keyword"
@@ -237,7 +313,9 @@ Pour chaque suggestion:
 6. Explique le raisonnement SEO derrière cette suggestion
 
 Propose au minimum:
-- 1 suggestion pour optimiser le Title (avec proposition concrète incluant "${clientData.query}")
+- 1 suggestion pour optimiser le Title (avec proposition concrète incluant "${
+    clientData.query
+  }")
 - 1 suggestion pour optimiser la Meta Description (avec proposition concrète)
 - 1-2 suggestions pour améliorer/réorganiser les Headings
 - 1-2 idées de nouvelles pages à créer basées sur les mots-clés des concurrents
@@ -378,7 +456,12 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   const { slug, websiteId, queryId } = await params;
   const user = (req as unknown as AuthRequest).user;
 
-  const searchQuery = await checkSearchQueryAccess(user.id, slug, websiteId, queryId);
+  const searchQuery = await checkSearchQueryAccess(
+    user.id,
+    slug,
+    websiteId,
+    queryId
+  );
   if (!searchQuery) {
     return NextResponse.json(
       { success: false, error: "Search query not found" },

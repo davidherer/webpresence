@@ -40,7 +40,7 @@ export async function runSerpAnalysis(
   console.log(
     `[SERP runSerpAnalysis] Website: ${website.name} (${website.url})`
   );
-  console.log(`[SERP runSerpAnalysis] Search Query: ${searchQuery.title}`);
+  console.log(`[SERP runSerpAnalysis] Search Query: ${searchQuery.query}`);
 
   const websiteDomain = new URL(website.url).hostname;
   // Normalize domain (remove www.) for comparison

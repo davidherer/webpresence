@@ -52,9 +52,9 @@ INSTRUCTIONS:
 1. Identifie les produits, services, thèmes, lieux ou entités que des utilisateurs seraient susceptibles de rechercher
 2. Pour chaque élément identifié, génère UNE requête de recherche (query) qui sera utilisée pour le suivi SERP
 3. Pour chaque requête, détermine:
-   - Un titre clair et descriptif
    - Une description de l'intention de recherche et de l'audience visée
    - La requête exacte (1 à 5 mots-clés) pour le SERP
+   - Des tags pour grouper les requêtes (type de produit, service, localisation, catégorie, etc.)
    - Le niveau de concurrence: "HIGH" (requête générique, forte concurrence) ou "LOW" (longue traîne, faible concurrence)
    - Un score de confiance (0-1) basé sur la pertinence de la requête pour ce site
 
@@ -65,9 +65,9 @@ RÉPONDS UNIQUEMENT EN JSON avec cette structure exacte:
 {
   "searchQueries": [
     {
-      "title": "Titre descriptif de la requête",
       "description": "Description de l'intention de recherche et audience visée",
       "query": "mots clés recherche",
+      "tags": ["catégorie", "type", "localisation"],
       "competitionLevel": "HIGH",
       "confidence": 0.85
     }
@@ -158,7 +158,6 @@ RÉPONDS EN JSON:
  * Generate SEO improvement suggestions for a search query
  */
 export async function generateSEOSuggestions(
-  searchQueryTitle: string,
   searchQuery: string,
   currentPage: PageContent,
   serpResults: Array<{
@@ -176,7 +175,7 @@ export async function generateSEOSuggestions(
     priority: number;
   }>
 > {
-  const prompt = `Tu es un expert SEO. Analyse les données suivantes et propose des améliorations pour augmenter la visibilité pour la requête "${searchQueryTitle}" (${searchQuery}).
+  const prompt = `Tu es un expert SEO. Analyse les données suivantes et propose des améliorations pour augmenter la visibilité pour la requête "${searchQuery}".
 
 PAGE ACTUELLE:
 ${JSON.stringify(currentPage, null, 2)}
@@ -213,9 +212,7 @@ RÉPONDS EN JSON:
   ]
 }`;
 
-  console.log(
-    `[Mistral] Generating SEO suggestions for "${searchQueryTitle}"...`
-  );
+  console.log(`[Mistral] Generating SEO suggestions for "${searchQuery}"...`);
   const response = await client.chat.complete({
     model: MODEL_LARGE,
     messages: [{ role: "user", content: prompt }],

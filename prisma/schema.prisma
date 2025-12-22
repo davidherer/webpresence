@@ -183,9 +183,9 @@ enum CompetitionLevel {
 model SearchQuery {
   id               String           @id @default(cuid())
   websiteId        String
-  title            String           // Display name for this search query
   description      String?          // Search intent description, target audience
   query            String           // The actual search query (keywords for SERP)
+  tags             String[]         @default([]) // Tags to group queries (product type, service, location, etc.)
   competitionLevel CompetitionLevel @default(HIGH) // HIGH = competitive, LOW = long-tail
   confidence       Float            @default(0) // AI confidence score 0-1
   isActive         Boolean          @default(true)

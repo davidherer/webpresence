@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Search, TrendingUp, TrendingDown, Minus, Zap, Mountain } from "lucide-react";
+import { ArrowLeft, Search, TrendingUp, TrendingDown, Minus, Zap, Mountain, Tag } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string }>;
@@ -93,8 +93,11 @@ export default async function QueriesPage({ params }: PageProps) {
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="flex items-center gap-2">
-                        {searchQuery.title}
+                      <CardTitle className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary">
+                          <Search className="w-4 h-4 mr-2" />
+                          {searchQuery.query}
+                        </span>
                         {!searchQuery.isActive && (
                           <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-1 rounded">
                             Inactif
@@ -112,6 +115,16 @@ export default async function QueriesPage({ params }: PageProps) {
                           </span>
                         )}
                       </CardTitle>
+                      {searchQuery.tags.length > 0 && (
+                        <div className="flex items-center gap-1 mt-2 flex-wrap">
+                          <Tag className="w-3 h-3 text-muted-foreground" />
+                          {searchQuery.tags.map((tag) => (
+                            <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <CardDescription className="mt-2">{searchQuery.description}</CardDescription>
                     </div>
                     {latestSerp && (
@@ -134,14 +147,6 @@ export default async function QueriesPage({ params }: PageProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Requête de recherche</h4>
-                      <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary">
-                        <Search className="w-4 h-4 mr-2" />
-                        {searchQuery.query}
-                      </span>
-                    </div>
-
                     <div className="flex items-center justify-between pt-4 border-t">
                       <div className="text-sm text-muted-foreground">
                         Confiance: {Math.round(searchQuery.confidence * 100)}%
