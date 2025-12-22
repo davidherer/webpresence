@@ -43,6 +43,17 @@ export async function sendAdminAuthCode(email: string) {
     },
   });
 
+  // En développement, afficher le code dans la console
+  if (process.env.NODE_ENV === "development") {
+    console.log("\n" + "=".repeat(60));
+    console.log("🔐 CODE D'AUTHENTIFICATION ADMIN");
+    console.log("=".repeat(60));
+    console.log(`Email: ${email}`);
+    console.log(`Code:  ${code}`);
+    console.log(`Expire: ${expiresAt.toLocaleString("fr-FR")}`);
+    console.log("=".repeat(60) + "\n");
+  }
+
   await resend.emails.send({
     from: process.env.EMAIL_FROM!,
     to: email,
