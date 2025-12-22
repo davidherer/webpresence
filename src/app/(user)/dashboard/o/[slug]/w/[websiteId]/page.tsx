@@ -5,6 +5,7 @@ import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
+import { CompetitorScore } from "./_components/CompetitorScore";
 import {
   ArrowLeft,
   BarChart3,
@@ -257,10 +258,7 @@ export default async function WebsitePage({ params }: PageProps) {
             </Card>
           ) : (
             <div className="space-y-3">
-              {website.competitors.slice(0, 5).map((competitor) => {
-                const latestPosition = competitor.serpResults[0]?.position;
-
-                return (
+              {website.competitors.slice(0, 5).map((competitor) => (
                   <Link key={competitor.id} href={`/dashboard/o/${slug}/w/${websiteId}/competitors/${competitor.id}`}>
                     <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                       <CardContent className="py-4">
@@ -271,17 +269,17 @@ export default async function WebsitePage({ params }: PageProps) {
                               {competitor.url}
                             </p>
                           </div>
-                          <span className="text-lg font-semibold">
-                            {latestPosition !== null && latestPosition !== undefined
-                              ? `#${latestPosition}`
-                              : "-"}
-                          </span>
+                          <CompetitorScore
+                            orgSlug={slug}
+                            websiteId={websiteId}
+                            competitorId={competitor.id}
+                            competitorUrl={competitor.url}
+                          />
                         </div>
                       </CardContent>
                     </Card>
                   </Link>
-                );
-              })}
+                ))}
             </div>
           )}
         </div>
