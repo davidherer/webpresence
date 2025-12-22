@@ -2,9 +2,12 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, ExternalLink, Calendar } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, ExternalLink } from "lucide-react";
+import { SerpChart } from "./_components/SerpChart";
+import { CompetitorsList } from "./_components/CompetitorsList";
+import { SuggestionsList } from "./_components/SuggestionsList";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; productId: string }>;
@@ -28,7 +31,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  // Get product with SERP history and suggestions
+  // Get product with SERP history
   const product = await prisma.product.findFirst({
     where: {
       id: productId,
@@ -41,11 +44,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
       website: true,
       serpResults: {
         orderBy: { createdAt: "desc" },
-        take: 10,
+        take: 2,
       },
-      aiSuggestions: {
-        orderBy: { createdAt: "desc" },
-        where: { status: { not: "dismissed" } },
+      _count: {
+        select: {
+          serpResults: true,
+          aiSuggestions: true,
+        },
       },
     },
   });
@@ -108,9 +113,6 @@ export default async function ProductDetailPage({ params }: PageProps) {
           <Card>
             <CardHeader>
               <CardTitle>Mots-clés surveillés</CardTitle>
-              <CardDescription>
-                Les mots-clés principaux pour ce produit utilisés dans l'analyse SERP
-              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -126,91 +128,26 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
-          {/* SERP History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Historique de positionnement</CardTitle>
-              <CardDescription>Les 10 dernières vérifications de position dans les moteurs de recherche</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {product.serpResults.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Aucune donnée de positionnement disponible. L'analyse SERP n'a pas encore été effectuée.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {product.serpResults.map((result) => (
-                    <div key={result.id} className="flex items-center gap-4 p-3 rounded-lg border">
-                      <div className="flex items-center gap-2 min-w-[80px]">
-                        <span className="text-2xl font-bold">#{result.position}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{result.title}</div>
-                        <div className="text-sm text-muted-foreground truncate">{result.query}</div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground whitespace-nowrap">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(result.createdAt).toLocaleDateString("fr-FR")}
-                      </div>
-                      {result.url && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={result.url} target="_blank" rel="noopener noreferrer">
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          {/* SERP Chart - Client Component */}
+          <SerpChart
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+          />
 
-          {/* AI Suggestions */}
-          {product.aiSuggestions.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Suggestions d'amélioration</CardTitle>
-                <CardDescription>Recommandations générées par l'IA pour améliorer le positionnement</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {product.aiSuggestions.map((suggestion) => (
-                    <div key={suggestion.id} className="p-4 rounded-lg border">
-                      <div className="flex items-start justify-between gap-4 mb-2">
-                        <h4 className="font-medium">{suggestion.title}</h4>
-                        <span
-                          className={`text-xs px-2 py-1 rounded ${
-                            suggestion.priority === "high"
-                              ? "bg-red-100 text-red-700"
-                              : suggestion.priority === "medium"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {suggestion.priority === "high"
-                            ? "Haute"
-                            : suggestion.priority === "medium"
-                              ? "Moyenne"
-                              : "Basse"}
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{suggestion.content}</p>
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-xs text-muted-foreground">
-                          Type: {suggestion.type === "content" ? "Contenu" : suggestion.type === "keyword" ? "Mot-clé" : suggestion.type === "technical" ? "Technique" : "Backlink"}
-                        </span>
-                        <span className="text-xs text-muted-foreground">•</span>
-                        <span className="text-xs text-muted-foreground">
-                          {suggestion.status === "pending" ? "En attente" : "Acceptée"}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Competitors - Client Component */}
+          <CompetitorsList
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+          />
+
+          {/* Suggestions - Client Component */}
+          <SuggestionsList
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+          />
         </div>
 
         {/* Sidebar */}
@@ -224,12 +161,22 @@ export default async function ProductDetailPage({ params }: PageProps) {
               <div>
                 <div className="text-sm font-medium text-muted-foreground mb-1">Confiance IA</div>
                 <div className="text-2xl font-bold">{Math.round(product.confidence * 100)}%</div>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-2">
                   <div
                     className="bg-primary h-2 rounded-full"
                     style={{ width: `${product.confidence * 100}%` }}
                   />
                 </div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">Analyses SERP</div>
+                <div className="text-2xl font-bold">{product._count.serpResults}</div>
+              </div>
+
+              <div>
+                <div className="text-sm font-medium text-muted-foreground mb-1">Suggestions IA</div>
+                <div className="text-2xl font-bold">{product._count.aiSuggestions}</div>
               </div>
 
               <div>
