@@ -12,6 +12,10 @@ import {
   Key,
   Settings,
   Link as LinkIcon,
+  Type,
+  List,
+  PlusCircle,
+  Tag,
 } from "lucide-react";
 
 interface SuggestionsListProps {
@@ -22,7 +26,7 @@ interface SuggestionsListProps {
 
 interface Suggestion {
   id: string;
-  type: "content" | "keyword" | "technical" | "backlink";
+  type: string;
   title: string;
   content: string;
   priority: number;
@@ -38,7 +42,7 @@ interface Stats {
   byPriority: { high: number; medium: number; low: number };
 }
 
-const TYPE_CONFIG = {
+const TYPE_CONFIG: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string; color: string }> = {
   content: {
     icon: FileText,
     label: "Contenu",
@@ -58,6 +62,31 @@ const TYPE_CONFIG = {
     icon: LinkIcon,
     label: "Backlink",
     color: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+  },
+  title: {
+    icon: Type,
+    label: "Title",
+    color: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-300",
+  },
+  description: {
+    icon: FileText,
+    label: "Description",
+    color: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
+  },
+  url: {
+    icon: LinkIcon,
+    label: "URL",
+    color: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+  },
+  headings: {
+    icon: List,
+    label: "Headings",
+    color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+  },
+  new_page: {
+    icon: PlusCircle,
+    label: "Nouvelle page",
+    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   },
 };
 
@@ -273,8 +302,13 @@ export function SuggestionsList({ orgSlug, websiteId, productId }: SuggestionsLi
         ) : (
           <div className="space-y-4">
             {suggestions.map((suggestion) => {
-              const TypeIcon = TYPE_CONFIG[suggestion.type].icon;
-              const typeConfig = TYPE_CONFIG[suggestion.type];
+              const defaultConfig = {
+                icon: Lightbulb,
+                label: suggestion.type,
+                color: "bg-gray-100 text-gray-700 dark:bg-gray-950 dark:text-gray-300",
+              };
+              const typeConfig = TYPE_CONFIG[suggestion.type] || defaultConfig;
+              const TypeIcon = typeConfig.icon;
 
               return (
                 <div

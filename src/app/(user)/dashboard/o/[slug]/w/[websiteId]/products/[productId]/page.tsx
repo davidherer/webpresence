@@ -10,6 +10,7 @@ import { CompetitorsList } from "./_components/CompetitorsList";
 import { SuggestionsList } from "./_components/SuggestionsList";
 import { KeywordsManager } from "./_components/KeywordsManager";
 import { MetaComparisonBlock } from "./_components/MetaComparisonBlock";
+import { AISuggestionsBlock } from "./_components/AISuggestionsBlock";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; productId: string }>;
@@ -135,6 +136,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           {/* Meta Comparison - Client Component */}
           <MetaComparisonBlock
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+          />
+
+          {/* AI Suggestions - Client Component */}
+          <AISuggestionsBlock
             orgSlug={slug}
             websiteId={websiteId}
             productId={productId}
