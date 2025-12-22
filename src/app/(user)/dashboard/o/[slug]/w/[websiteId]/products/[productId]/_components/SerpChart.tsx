@@ -27,9 +27,9 @@ interface ChartDataPoint {
 }
 
 interface KeywordStats {
-  position: number;
-  change: number;
-  trend: "up" | "down" | "stable";
+  position: number | null;
+  change: number | null;
+  trend: "up" | "down" | "stable" | "absent";
 }
 
 const COLORS = [
@@ -196,7 +196,11 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
                       </p>
                       {stat && (
                         <div className="flex items-center gap-1">
-                          <span className="text-lg font-bold">#{stat.position}</span>
+                          {stat.position === null ? (
+                            <span className="text-lg font-bold text-orange-500">Absent</span>
+                          ) : (
+                            <span className="text-lg font-bold">#{stat.position}</span>
+                          )}
                           {stat.trend === "up" && (
                             <TrendingUp className="w-4 h-4 text-green-500" />
                           )}
@@ -206,7 +210,10 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
                           {stat.trend === "stable" && (
                             <Minus className="w-4 h-4 text-gray-400" />
                           )}
-                          {stat.change !== 0 && (
+                          {stat.trend === "absent" && (
+                            <span className="text-xs text-orange-500">Non classé</span>
+                          )}
+                          {stat.change !== null && stat.change !== 0 && (
                             <span
                               className={`text-xs ${
                                 stat.change > 0 ? "text-green-600" : "text-red-600"
@@ -248,7 +255,7 @@ export function SerpChart({ orgSlug, websiteId, productId }: SerpChartProps) {
                   <Tooltip
                     labelFormatter={(label) => formatDate(label as string)}
                     formatter={(value) => [
-                      `#${value}`,
+                      value === null || value === undefined ? "Absent" : `#${value}`,
                     ]}
                   />
                   <Legend />

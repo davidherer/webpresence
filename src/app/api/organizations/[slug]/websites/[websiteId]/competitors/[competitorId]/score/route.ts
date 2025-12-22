@@ -67,7 +67,10 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     );
   }
 
-  const competitorDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
+  const competitorDomain = new URL(competitor.url).hostname.replace(
+    /^www\./,
+    ""
+  );
 
   // Get all products for this website with their latest SERP results
   const products = await prisma.product.findMany({
@@ -84,8 +87,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   });
 
   let better = 0; // Times we rank better than competitor
-  let worse = 0;  // Times competitor ranks better than us
-  let total = 0;  // Total comparisons
+  let worse = 0; // Times competitor ranks better than us
+  let total = 0; // Total comparisons
 
   // For each product, check the SERP blob for competitor position
   for (const product of products) {
@@ -100,16 +103,21 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
         if (!serpData.results || !Array.isArray(serpData.results)) continue;
 
         // Find competitor in results
-        const competitorResult = serpData.results.find((r: { domain: string }) => {
-          const resultDomain = r.domain.replace(/^www\./, "");
-          return resultDomain === competitorDomain || resultDomain.endsWith(`.${competitorDomain}`);
-        });
+        const competitorResult = serpData.results.find(
+          (r: { domain: string }) => {
+            const resultDomain = r.domain.replace(/^www\./, "");
+            return (
+              resultDomain === competitorDomain ||
+              resultDomain.endsWith(`.${competitorDomain}`)
+            );
+          }
+        );
 
         if (competitorResult) {
           total++;
           const ourPosition = serpResult.position;
           const theirPosition = competitorResult.position;
-          
+
           if (ourPosition < theirPosition) {
             better++; // Lower position = better ranking
           } else if (ourPosition > theirPosition) {

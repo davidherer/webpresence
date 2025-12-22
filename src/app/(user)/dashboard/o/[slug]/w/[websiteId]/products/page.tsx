@@ -105,14 +105,18 @@ export default async function ProductsPage({ params }: PageProps) {
                     </div>
                     {latestSerp && (
                       <div className="flex items-center gap-2 ml-4">
-                        {previousPosition && latestSerp.position < previousPosition ? (
+                        {previousPosition && latestSerp.position !== null && latestSerp.position > 0 && latestSerp.position < previousPosition ? (
                           <TrendingUp className="w-4 h-4 text-green-500" />
-                        ) : previousPosition && latestSerp.position > previousPosition ? (
+                        ) : previousPosition && latestSerp.position !== null && latestSerp.position > 0 && latestSerp.position > previousPosition ? (
                           <TrendingDown className="w-4 h-4 text-red-500" />
                         ) : (
                           <Minus className="w-4 h-4 text-gray-400" />
                         )}
-                        <span className="text-2xl font-bold">#{latestSerp.position}</span>
+                        {latestSerp.position !== null && latestSerp.position > 0 ? (
+                          <span className="text-2xl font-bold">#{latestSerp.position}</span>
+                        ) : (
+                          <span className="text-2xl font-bold text-orange-500">Absent</span>
+                        )}
                       </div>
                     )}
                   </div>

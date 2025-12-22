@@ -222,9 +222,11 @@ export default async function WebsitePage({ params }: PageProps) {
                             <div className="flex items-center gap-2">
                               {getTrendIcon(trend)}
                               <span className="text-lg font-semibold">
-                                {latestPosition !== null && latestPosition !== undefined
+                                {latestPosition !== null && latestPosition !== undefined && latestPosition > 0
                                   ? `#${latestPosition}`
-                                  : "-"}
+                                  : product.serpResults.length > 0
+                                    ? <span className="text-orange-500">Absent</span>
+                                    : "-"}
                               </span>
                             </div>
                           </div>

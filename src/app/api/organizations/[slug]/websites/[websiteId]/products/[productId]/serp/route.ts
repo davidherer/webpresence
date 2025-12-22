@@ -97,7 +97,11 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   // Calculate stats
   const latestByKeyword: Record<
     string,
-    { position: number; change: number; trend: "up" | "down" | "stable" }
+    {
+      position: number | null;
+      change: number | null;
+      trend: "up" | "down" | "stable" | "absent";
+    }
   > = {};
 
   for (const kw of keywords) {
@@ -106,15 +110,24 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       const latest = kwResults[kwResults.length - 1];
       const previous =
         kwResults.length > 1 ? kwResults[kwResults.length - 2] : null;
-      const latestPos = latest.position ?? 0;
-      const previousPos = previous?.position ?? latestPos;
-      const change = previousPos - latestPos;
+      const latestPos = latest.position; // Keep null if absent
+      const previousPos = previous?.position;
 
-      latestByKeyword[kw] = {
-        position: latestPos,
-        change,
-        trend: change > 0 ? "up" : change < 0 ? "down" : "stable",
-      };
+      // If current position is null (absent), mark as absent
+      if (latestPos === null) {
+        latestByKeyword[kw] = {
+          position: null,
+          change: null,
+          trend: "absent",
+        };
+      } else {
+        const change = previousPos !== null ? previousPos - latestPos : 0;
+        latestByKeyword[kw] = {
+          position: latestPos,
+          change,
+          trend: change > 0 ? "up" : change < 0 ? "down" : "stable",
+        };
+      }
     }
   }
 

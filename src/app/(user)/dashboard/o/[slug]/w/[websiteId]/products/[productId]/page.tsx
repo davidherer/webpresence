@@ -65,8 +65,12 @@ export default async function ProductDetailPage({ params }: PageProps) {
   // Calculate position trend
   const latestPosition = product.serpResults[0]?.position;
   const previousPosition = product.serpResults[1]?.position;
-  let trend: "up" | "down" | "stable" | null = null;
-  if (latestPosition && previousPosition) {
+  const hasPosition = latestPosition !== null && latestPosition !== undefined && latestPosition > 0;
+  let trend: "up" | "down" | "stable" | "absent" | null = null;
+  
+  if (!hasPosition && product.serpResults.length > 0) {
+    trend = "absent";
+  } else if (hasPosition && previousPosition !== null && previousPosition !== undefined && previousPosition > 0) {
     if (latestPosition < previousPosition) trend = "up";
     else if (latestPosition > previousPosition) trend = "down";
     else trend = "stable";
@@ -95,13 +99,17 @@ export default async function ProductDetailPage({ params }: PageProps) {
             </div>
             <p className="text-muted-foreground">{product.description}</p>
           </div>
-          {latestPosition && (
+          {product.serpResults.length > 0 && (
             <div className="flex items-center gap-3 ml-8">
               {trend === "up" && <TrendingUp className="w-6 h-6 text-green-500" />}
               {trend === "down" && <TrendingDown className="w-6 h-6 text-red-500" />}
               {trend === "stable" && <Minus className="w-6 h-6 text-gray-400" />}
               <div className="text-right">
-                <div className="text-4xl font-bold">#{latestPosition}</div>
+                {hasPosition ? (
+                  <div className="text-4xl font-bold">#{latestPosition}</div>
+                ) : (
+                  <div className="text-4xl font-bold text-orange-500">Absent</div>
+                )}
                 <div className="text-sm text-muted-foreground">Position actuelle</div>
               </div>
             </div>
