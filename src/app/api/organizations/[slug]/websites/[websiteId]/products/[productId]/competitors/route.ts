@@ -77,7 +77,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   });
 
   // Get unique queries we've searched (take most recent for each query)
-  const uniqueQueries = new Map<string, typeof ourSerpResults[0]>();
+  const uniqueQueries = new Map<string, (typeof ourSerpResults)[0]>();
   for (const result of ourSerpResults) {
     if (!uniqueQueries.has(result.query)) {
       uniqueQueries.set(result.query, result);
@@ -97,7 +97,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Build a map of competitor positions per keyword by reading from stored SERP blobs
   const competitorPositions: Record<string, Record<string, number>> = {};
-  
+
   // Initialize for each competitor
   for (const comp of websiteCompetitors) {
     const normalizedDomain = new URL(comp.url).hostname.replace(/^www\./, "");
@@ -118,13 +118,18 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       // Extract positions for each competitor
       for (const result of serpData.results as SerpResultFromBlob[]) {
         const normalizedResultDomain = result.domain.replace(/^www\./, "");
-        
+
         // Check if this domain matches any of our competitors
         for (const comp of websiteCompetitors) {
-          const normalizedCompDomain = new URL(comp.url).hostname.replace(/^www\./, "");
-          
-          if (normalizedResultDomain === normalizedCompDomain ||
-              normalizedResultDomain.endsWith(`.${normalizedCompDomain}`)) {
+          const normalizedCompDomain = new URL(comp.url).hostname.replace(
+            /^www\./,
+            ""
+          );
+
+          if (
+            normalizedResultDomain === normalizedCompDomain ||
+            normalizedResultDomain.endsWith(`.${normalizedCompDomain}`)
+          ) {
             competitorPositions[normalizedCompDomain][query] = result.position;
             break;
           }
@@ -137,23 +142,73 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
 
   // Build competitor data with position comparison
   const competitorData = websiteCompetitors.map((competitor) => {
-    const normalizedDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
+    const normalizedDomain = new URL(competitor.url).hostname.replace(
+      /^www\./,
+      ""
+    );
     const positionsByKeyword = competitorPositions[normalizedDomain] || {};
-    
-    // Get keywords where both us and competitor have positions
-    const keywords = Object.keys(positionsByKeyword);
-    
-    const comparison = keywords
-      .filter(kw => ourPositionsByKeyword[kw] !== undefined && ourPositionsByKeyword[kw] !== null)
-      .map((kw) => ({
-        keyword: kw,
-        ourPosition: ourPositionsByKeyword[kw]!,
-        competitorPosition: positionsByKeyword[kw],
-        difference: ourPositionsByKeyword[kw]! - positionsByKeyword[kw],
-        weAreBetter: ourPositionsByKeyword[kw]! < positionsByKeyword[kw],
-      }));
 
-    // Average position difference (negative = they are better)
+    // Get all keywords where either we or competitor have data
+    const allSearchedQueries = [...uniqueQueries.keys()];
+
+    // Build comparison for all keywords where the competitor appears
+    // OR where we have a position (to show when competitor is absent)
+    const comparison = allSearchedQueries
+      .filter((kw) => {
+        const ourPos = ourPositionsByKeyword[kw];
+        const theirPos = positionsByKeyword[kw];
+        // Include if competitor is present OR if we are present (to show complete picture)
+        return (
+          theirPos !== undefined ||
+          (ourPos !== null && ourPos !== undefined && ourPos > 0)
+        );
+      })
+      .map((kw) => {
+        const ourPos = ourPositionsByKeyword[kw];
+        const theirPos = positionsByKeyword[kw];
+
+        // Handle absent cases (position 0 means "absent")
+        const ourPosition =
+          ourPos !== null && ourPos !== undefined && ourPos > 0 ? ourPos : 0;
+        const competitorPosition = theirPos !== undefined ? theirPos : 0;
+
+        // Calculate difference based on presence
+        let difference: number;
+        let weAreBetter: boolean;
+
+        if (ourPosition > 0 && competitorPosition === 0) {
+          // We are present, they are not - we are much better
+          difference = 100; // Big positive = we are better
+          weAreBetter = true;
+        } else if (ourPosition === 0 && competitorPosition > 0) {
+          // They are present, we are not - they are much better
+          difference = -100; // Big negative = they are better
+          weAreBetter = false;
+        } else if (ourPosition > 0 && competitorPosition > 0) {
+          // Both present - compare positions
+          difference = competitorPosition - ourPosition; // Positive = we are better (lower position)
+          weAreBetter = ourPosition < competitorPosition;
+        } else {
+          // Both absent (shouldn't happen due to filter, but just in case)
+          difference = 0;
+          weAreBetter = false;
+        }
+
+        return {
+          keyword: kw,
+          ourPosition,
+          competitorPosition,
+          difference,
+          weAreBetter,
+        };
+      });
+
+    // Calculate shared keywords (where both have data)
+    const sharedKeywords = comparison.filter(
+      (c) => c.ourPosition > 0 && c.competitorPosition > 0
+    ).length;
+
+    // Average position difference (considers absent as very bad)
     const avgDifference =
       comparison.length > 0
         ? comparison.reduce((sum, c) => sum + c.difference, 0) /
@@ -165,8 +220,8 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
       name: competitor.name,
       url: competitor.url,
       description: competitor.description,
-      sharedKeywords: comparison.length,
-      totalKeywordsTracked: keywords.length,
+      sharedKeywords,
+      totalKeywordsTracked: comparison.length,
       comparison,
       avgDifference,
       threat: avgDifference > 5 ? "low" : avgDifference > 0 ? "medium" : "high",

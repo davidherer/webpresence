@@ -93,7 +93,7 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   // For each product, check the SERP blob for competitor position
   for (const product of products) {
     for (const serpResult of product.serpResults) {
-      if (!serpResult.rawDataBlobUrl || serpResult.position === null) continue;
+      if (!serpResult.rawDataBlobUrl) continue;
 
       try {
         const response = await fetch(serpResult.rawDataBlobUrl);
@@ -113,15 +113,29 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
           }
         );
 
-        if (competitorResult) {
-          total++;
-          const ourPosition = serpResult.position;
-          const theirPosition = competitorResult.position;
+        const ourPosition = serpResult.position;
+        const theirPosition = competitorResult?.position ?? null;
 
-          if (ourPosition < theirPosition) {
-            better++; // Lower position = better ranking
-          } else if (ourPosition > theirPosition) {
+        // Count comparison only if at least one of us is present
+        const weArePresent = ourPosition !== null && ourPosition > 0;
+        const theyArePresent = theirPosition !== null && theirPosition > 0;
+
+        if (weArePresent || theyArePresent) {
+          total++;
+
+          if (weArePresent && !theyArePresent) {
+            // We are present, they are not - we are better
+            better++;
+          } else if (!weArePresent && theyArePresent) {
+            // They are present, we are not - they are better
             worse++;
+          } else if (weArePresent && theyArePresent) {
+            // Both present - compare positions
+            if (ourPosition! < theirPosition!) {
+              better++; // Lower position = better ranking
+            } else if (ourPosition! > theirPosition!) {
+              worse++;
+            }
           }
         }
       } catch {

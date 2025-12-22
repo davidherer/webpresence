@@ -316,16 +316,20 @@ export function CompetitorsList({ orgSlug, websiteId, productId }: CompetitorsLi
                             <div className="flex items-center gap-6">
                               <div className="text-center">
                                 <p className="text-xs text-muted-foreground">Nous</p>
-                                <p className="font-bold">#{cmp.ourPosition}</p>
+                                <p className={`font-bold ${cmp.ourPosition === 0 ? 'text-orange-500' : ''}`}>
+                                  {cmp.ourPosition > 0 ? `#${cmp.ourPosition}` : 'Absent'}
+                                </p>
                               </div>
                               <div className="text-center">
                                 <p className="text-xs text-muted-foreground">Eux</p>
-                                <p className="font-bold">#{cmp.competitorPosition}</p>
+                                <p className={`font-bold ${cmp.competitorPosition === 0 ? 'text-orange-500' : ''}`}>
+                                  {cmp.competitorPosition > 0 ? `#${cmp.competitorPosition}` : 'Absent'}
+                                </p>
                               </div>
                               <div className="w-8 flex justify-center">
                                 {cmp.weAreBetter ? (
                                   <TrendingUp className="w-5 h-5 text-green-500" />
-                                ) : cmp.difference === 0 ? (
+                                ) : cmp.ourPosition === cmp.competitorPosition ? (
                                   <span className="text-gray-400">=</span>
                                 ) : (
                                   <TrendingDown className="w-5 h-5 text-red-500" />
