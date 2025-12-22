@@ -16,70 +16,79 @@ interface PageProps {
   params: Promise<{ slug: string; websiteId: string }>;
 }
 
-// Compute competitor score based on SERP comparisons
+/**
+ * Compute competitor score based on SERP comparisons.
+ * Uses SerpResult data directly from the database (not from blob storage).
+ */
 async function computeCompetitorScore(
   competitorId: string,
   websiteId: string
 ): Promise<{ better: number; worse: number; total: number }> {
-  // Get all products for this website with their latest SERP results
-  const products = await prisma.product.findMany({
-    where: { websiteId, isActive: true },
-    select: {
-      id: true,
-      serpResults: {
-        where: { position: { not: null } },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { query: true, position: true, rawDataBlobUrl: true },
-      },
+  // Get our latest SERP positions (from products)
+  const ourResults = await prisma.serpResult.findMany({
+    where: {
+      product: { websiteId, isActive: true },
+      productId: { not: null },
     },
+    orderBy: { createdAt: "desc" },
+    select: { query: true, position: true },
   });
 
-  // Get competitor URL
-  const competitor = await prisma.competitor.findUnique({
-    where: { id: competitorId },
-    select: { url: true },
+  // Build a map of our latest position per query
+  const ourPositions = new Map<string, number | null>();
+  for (const result of ourResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!ourPositions.has(queryLower)) {
+      ourPositions.set(queryLower, result.position);
+    }
+  }
+
+  // Get competitor's latest SERP positions
+  const competitorResults = await prisma.serpResult.findMany({
+    where: { competitorId },
+    orderBy: { createdAt: "desc" },
+    select: { query: true, position: true },
   });
 
-  if (!competitor) return { better: 0, worse: 0, total: 0 };
+  // Build a map of competitor's latest position per query
+  const theirPositions = new Map<string, number | null>();
+  for (const result of competitorResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!theirPositions.has(queryLower)) {
+      theirPositions.set(queryLower, result.position);
+    }
+  }
 
-  const competitorDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
-  
-  let better = 0; // Times we rank better than competitor
-  let worse = 0;  // Times competitor ranks better than us
-  let total = 0;  // Total comparisons
+  // Compare positions on common queries
+  let better = 0;
+  let worse = 0;
+  let total = 0;
 
-  // For each product, check the SERP blob for competitor position
-  for (const product of products) {
-    for (const serpResult of product.serpResults) {
-      if (!serpResult.rawDataBlobUrl || serpResult.position === null) continue;
+  // Get all unique queries from both sets
+  const allQueries = new Set([...ourPositions.keys(), ...theirPositions.keys()]);
 
-      try {
-        const response = await fetch(serpResult.rawDataBlobUrl);
-        if (!response.ok) continue;
+  for (const query of allQueries) {
+    const ourPos = ourPositions.get(query);
+    const theirPos = theirPositions.get(query);
 
-        const serpData = await response.json();
-        if (!serpData.results || !Array.isArray(serpData.results)) continue;
+    const weArePresent = ourPos !== null && ourPos !== undefined && ourPos > 0;
+    const theyArePresent = theirPos !== null && theirPos !== undefined && theirPos > 0;
 
-        // Find competitor in results
-        const competitorResult = serpData.results.find((r: { domain: string }) => {
-          const resultDomain = r.domain.replace(/^www\./, "");
-          return resultDomain === competitorDomain || resultDomain.endsWith(`.${competitorDomain}`);
-        });
+    // Only count if at least one is present
+    if (weArePresent || theyArePresent) {
+      total++;
 
-        if (competitorResult) {
-          total++;
-          const ourPosition = serpResult.position;
-          const theirPosition = competitorResult.position;
-          
-          if (ourPosition < theirPosition) {
-            better++; // Lower position = better ranking
-          } else if (ourPosition > theirPosition) {
-            worse++;
-          }
+      if (weArePresent && !theyArePresent) {
+        better++;
+      } else if (!weArePresent && theyArePresent) {
+        worse++;
+      } else if (weArePresent && theyArePresent) {
+        if (ourPos! < theirPos!) {
+          better++;
+        } else if (ourPos! > theirPos!) {
+          worse++;
         }
-      } catch {
-        // Skip invalid blobs
+        // Equal positions don't count as better or worse
       }
     }
   }

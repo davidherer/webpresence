@@ -43,6 +43,9 @@ async function checkWebsiteAccess(
 /**
  * GET /api/organizations/:slug/websites/:websiteId/competitors/:competitorId/score
  * Get the SERP comparison score for a competitor
+ * 
+ * Compares our positions (from SerpResult with productId) with competitor positions
+ * (from SerpResult with competitorId) on the same queries.
  */
 export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
   const { slug, websiteId, competitorId } = await params;
@@ -70,94 +73,81 @@ export const GET = withUserAuth<RouteContext>(async (req, { params }) => {
     );
   }
 
-  const competitorDomain = new URL(competitor.url).hostname.replace(
-    /^www\./,
-    ""
-  );
-
-  // Get all products for this website with their latest SERP results
-  const products = await prisma.product.findMany({
-    where: { websiteId, isActive: true },
+  // Get our latest SERP positions (from products) - group by query to get latest
+  const ourResults = await prisma.serpResult.findMany({
+    where: {
+      product: { websiteId, isActive: true },
+      productId: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
     select: {
-      id: true,
-      serpResults: {
-        orderBy: { createdAt: "desc" },
-        take: 10, // Get more results per product to find all queries
-        select: { query: true, position: true, rawDataBlobUrl: true },
-      },
+      query: true,
+      position: true,
+      createdAt: true,
     },
   });
 
-  let better = 0; // Times we rank better than competitor
-  let worse = 0; // Times competitor ranks better than us
-  let total = 0; // Total comparisons
-  const seenQueries = new Set<string>(); // Track processed queries to avoid duplicates
-
-  // Helper function to check if a SERP result domain matches the competitor
-  // Prioritizes: 1) exact match, 2) result is subdomain of competitor, 3) competitor is subdomain of result
-  function domainMatchesCompetitor(
-    resultDomain: string,
-    compDomain: string
-  ): boolean {
-    const resultLower = resultDomain.replace(/^www\./, "").toLowerCase();
-    const compLower = compDomain.toLowerCase();
-
-    return (
-      resultLower === compLower ||
-      resultLower.endsWith(`.${compLower}`) ||
-      compLower.endsWith(`.${resultLower}`)
-    );
+  // Build a map of our latest position per query
+  const ourPositions = new Map<string, number | null>();
+  for (const result of ourResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!ourPositions.has(queryLower)) {
+      ourPositions.set(queryLower, result.position);
+    }
   }
 
-  // For each product, check the SERP blob for competitor position
-  for (const product of products) {
-    for (const serpResult of product.serpResults) {
-      // Skip if we've already processed this query
-      if (seenQueries.has(serpResult.query)) continue;
+  // Get competitor's latest SERP positions
+  const competitorResults = await prisma.serpResult.findMany({
+    where: {
+      competitorId,
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      query: true,
+      position: true,
+      createdAt: true,
+    },
+  });
 
-      if (!serpResult.rawDataBlobUrl) continue;
+  // Build a map of competitor's latest position per query
+  const theirPositions = new Map<string, number | null>();
+  for (const result of competitorResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!theirPositions.has(queryLower)) {
+      theirPositions.set(queryLower, result.position);
+    }
+  }
 
-      try {
-        const response = await fetch(serpResult.rawDataBlobUrl);
-        if (!response.ok) continue;
+  // Compare positions on common queries
+  let better = 0;
+  let worse = 0;
+  let total = 0;
 
-        const serpData = await response.json();
-        if (!serpData.results || !Array.isArray(serpData.results)) continue;
+  // Get all unique queries from both sets
+  const allQueries = new Set([...ourPositions.keys(), ...theirPositions.keys()]);
 
-        // Find competitor in results
-        const competitorResult = serpData.results.find(
-          (r: { domain: string }) =>
-            domainMatchesCompetitor(r.domain, competitorDomain)
-        );
+  for (const query of allQueries) {
+    const ourPos = ourPositions.get(query);
+    const theirPos = theirPositions.get(query);
 
-        const ourPosition = serpResult.position;
-        const theirPosition = competitorResult?.position ?? null;
+    const weArePresent = ourPos !== null && ourPos !== undefined && ourPos > 0;
+    const theyArePresent = theirPos !== null && theirPos !== undefined && theirPos > 0;
 
-        // Count comparison only if at least one of us is present
-        const weArePresent = ourPosition !== null && ourPosition > 0;
-        const theyArePresent = theirPosition !== null && theirPosition > 0;
+    // Only count if at least one is present
+    if (weArePresent || theyArePresent) {
+      total++;
 
-        if (weArePresent || theyArePresent) {
-          seenQueries.add(serpResult.query); // Mark this query as processed
-          total++;
-
-          if (weArePresent && !theyArePresent) {
-            // We are present, they are not - we are better
-            better++;
-          } else if (!weArePresent && theyArePresent) {
-            // They are present, we are not - they are better
-            worse++;
-          } else if (weArePresent && theyArePresent) {
-            // Both present - compare positions
-            if (ourPosition! < theirPosition!) {
-              better++; // Lower position = better ranking
-            } else if (ourPosition! > theirPosition!) {
-              worse++;
-            }
-          }
+      if (weArePresent && !theyArePresent) {
+        better++;
+      } else if (!weArePresent && theyArePresent) {
+        worse++;
+      } else if (weArePresent && theyArePresent) {
+        if (ourPos! < theirPos!) {
+          better++;
+        } else if (ourPos! > theirPos!) {
+          worse++;
         }
-      } catch {
-        // Skip invalid blobs
+        // Equal positions don't count as better or worse
       }
     }
   }

@@ -29,22 +29,15 @@ interface SerpComparison {
   weAreBetter: boolean;
 }
 
+/**
+ * Get SERP comparisons between our products and a competitor.
+ * Uses SerpResult data directly from the database (not from blob storage).
+ */
 async function getCompetitorSerpComparisons(
   competitorId: string,
   websiteId: string
 ): Promise<SerpComparison[]> {
-  // Get competitor URL
-  const competitor = await prisma.competitor.findUnique({
-    where: { id: competitorId },
-    select: { url: true },
-  });
-
-  if (!competitor) return [];
-
-  const competitorDomain = new URL(competitor.url).hostname.replace(/^www\./, "");
-
-  // Get all products for this website with their latest SERP results
-  // Don't filter by position to include cases where we are absent
+  // Get our latest SERP results for each product
   const products = await prisma.product.findMany({
     where: { websiteId, isActive: true },
     select: {
@@ -52,75 +45,85 @@ async function getCompetitorSerpComparisons(
       name: true,
       serpResults: {
         orderBy: { createdAt: "desc" },
-        take: 10, // Get more results per product to find all queries
-        select: { query: true, position: true, rawDataBlobUrl: true },
+        take: 50, // Get more results to have multiple queries per product
+        select: { query: true, position: true, createdAt: true },
       },
     },
   });
 
-  const comparisons: SerpComparison[] = [];
-  const seenQueries = new Set<string>();
-
+  // Build a map of our positions: query -> { position, productName, productId }
+  const ourPositions = new Map<string, { position: number | null; productName: string; productId: string }>();
   for (const product of products) {
-    for (const serpResult of product.serpResults) {
-      // Skip if we've already processed this query
-      if (seenQueries.has(serpResult.query)) continue;
-      
-      if (!serpResult.rawDataBlobUrl) continue;
-
-      try {
-        const response = await fetch(serpResult.rawDataBlobUrl);
-        if (!response.ok) continue;
-
-        const serpData = await response.json();
-        if (!serpData.results || !Array.isArray(serpData.results)) continue;
-
-        // Find competitor in results - match exact domain or subdomain relationships
-        const competitorResult = serpData.results.find((r: { domain: string; position: number }) => {
-          const resultDomain = r.domain.replace(/^www\./, "").toLowerCase();
-          const compDomain = competitorDomain.toLowerCase();
-          return (
-            resultDomain === compDomain ||
-            resultDomain.endsWith(`.${compDomain}`) ||
-            compDomain.endsWith(`.${resultDomain}`)
-          );
+    for (const result of product.serpResults) {
+      const queryLower = result.query.toLowerCase();
+      // Keep the first (most recent) result for each query
+      if (!ourPositions.has(queryLower)) {
+        ourPositions.set(queryLower, {
+          position: result.position,
+          productName: product.name,
+          productId: product.id,
         });
-
-        const ourPosition = serpResult.position !== null && serpResult.position > 0 ? serpResult.position : 0;
-        const theirPosition = competitorResult?.position ?? 0;
-
-        // Include if at least one of us is present
-        if (ourPosition > 0 || theirPosition > 0) {
-          seenQueries.add(serpResult.query);
-          
-          let weAreBetter: boolean;
-          if (ourPosition > 0 && theirPosition === 0) {
-            weAreBetter = true; // We are present, they are not
-          } else if (ourPosition === 0 && theirPosition > 0) {
-            weAreBetter = false; // They are present, we are not
-          } else {
-            weAreBetter = ourPosition < theirPosition; // Both present, lower is better
-          }
-          
-          comparisons.push({
-            query: serpResult.query,
-            productName: product.name,
-            productId: product.id,
-            ourPosition,
-            theirPosition,
-            weAreBetter,
-          });
-        }
-      } catch {
-        // Skip invalid blobs
       }
+    }
+  }
+
+  // Get competitor's SERP results
+  const competitorResults = await prisma.serpResult.findMany({
+    where: { competitorId },
+    orderBy: { createdAt: "desc" },
+    select: { query: true, position: true, createdAt: true },
+  });
+
+  // Build a map of competitor positions: query -> position
+  const theirPositions = new Map<string, number | null>();
+  for (const result of competitorResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!theirPositions.has(queryLower)) {
+      theirPositions.set(queryLower, result.position);
+    }
+  }
+
+  // Build comparisons for queries where we have data for both or at least one
+  const comparisons: SerpComparison[] = [];
+  const processedQueries = new Set<string>();
+
+  // First, process queries where we have our own data
+  for (const [query, ourData] of ourPositions.entries()) {
+    if (processedQueries.has(query)) continue;
+    processedQueries.add(query);
+
+    const theirPos = theirPositions.get(query);
+    const ourPos = ourData.position;
+
+    const weArePresent = ourPos !== null && ourPos > 0;
+    const theyArePresent = theirPos !== null && theirPos !== undefined && theirPos > 0;
+
+    // Only include if at least one is present
+    if (weArePresent || theyArePresent) {
+      let weAreBetter: boolean;
+      if (weArePresent && !theyArePresent) {
+        weAreBetter = true;
+      } else if (!weArePresent && theyArePresent) {
+        weAreBetter = false;
+      } else {
+        weAreBetter = ourPos! < theirPos!;
+      }
+
+      comparisons.push({
+        query: query,
+        productName: ourData.productName,
+        productId: ourData.productId,
+        ourPosition: ourPos ?? 0,
+        theirPosition: theirPos ?? 0,
+        weAreBetter,
+      });
     }
   }
 
   // Sort: queries where we are worse first, then by position difference
   return comparisons.sort((a, b) => {
     if (a.weAreBetter !== b.weAreBetter) {
-      return a.weAreBetter ? 1 : -1; // Show where we lose first
+      return a.weAreBetter ? 1 : -1;
     }
     return Math.abs(a.theirPosition - a.ourPosition) - Math.abs(b.theirPosition - b.ourPosition);
   });
