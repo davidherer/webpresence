@@ -9,6 +9,7 @@ import { SerpChart } from "./_components/SerpChart";
 import { CompetitorsList } from "./_components/CompetitorsList";
 import { SuggestionsList } from "./_components/SuggestionsList";
 import { KeywordsManager } from "./_components/KeywordsManager";
+import { MetaComparisonBlock } from "./_components/MetaComparisonBlock";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; productId: string }>;
@@ -127,6 +128,13 @@ export default async function ProductDetailPage({ params }: PageProps) {
 
           {/* Competitors - Client Component */}
           <CompetitorsList
+            orgSlug={slug}
+            websiteId={websiteId}
+            productId={productId}
+          />
+
+          {/* Meta Comparison - Client Component */}
+          <MetaComparisonBlock
             orgSlug={slug}
             websiteId={websiteId}
             productId={productId}
