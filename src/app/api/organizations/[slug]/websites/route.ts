@@ -143,6 +143,17 @@ export const POST = withUserAuth(
       },
     });
 
+    // In development, trigger analysis immediately without waiting for cron
+    if (process.env.NODE_ENV === "development") {
+      const analysis = await import("@/lib/analysis/initial");
+      analysis.runInitialAnalysis(website.id).catch((error) => {
+        console.error(
+          `[DEV] Failed to auto-start analysis for website ${website.id}:`,
+          error
+        );
+      });
+    }
+
     return NextResponse.json(
       {
         success: true,

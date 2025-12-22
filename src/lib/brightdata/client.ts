@@ -8,18 +8,22 @@ import type {
   SitemapUrl,
 } from "./types";
 
-const BRIGHTDATA_API_KEY = process.env.BRIGHTDATA_API_KEY!;
-const BRIGHTDATA_ZONE = process.env.BRIGHTDATA_ZONE || "web_unlocker";
+const BRIGHTDATA_API_KEY = process.env.BRIGHTDATA_API_KEY;
+const BRIGHTDATA_ZONE = process.env.BRIGHTDATA_ZONE || "isp";
+const USE_BRIGHTDATA = !!BRIGHTDATA_API_KEY;
 
-// Base URL for BrightData Web Unlocker API
-const BRIGHTDATA_BASE_URL = "https://api.brightdata.com";
+if (!USE_BRIGHTDATA && process.env.NODE_ENV !== "development") {
+  console.warn(
+    "[BrightData] No API key configured. Scraping will use direct fetch (not recommended for production)"
+  );
+}
 
 /**
  * Internal client for BrightData API
  * This abstraction is NEVER exposed to the frontend
  */
 class BrightDataClient {
-  private apiKey: string;
+  private apiKey: string | undefined;
   private zone: string;
 
   constructor() {
@@ -27,9 +31,16 @@ class BrightDataClient {
     this.zone = BRIGHTDATA_ZONE;
   }
 
-  private getProxyUrl(): string {
-    // BrightData proxy endpoint format
-    return `http://brd-customer-${this.zone}:${this.apiKey}@brd.superproxy.io:22225`;
+  private getProxyConfig() {
+    if (!USE_BRIGHTDATA || !this.apiKey) {
+      return null;
+    }
+    // BrightData proxy configuration
+    return {
+      host: "brd.superproxy.io",
+      port: 22225,
+      auth: `brd-customer-${this.zone}:${this.apiKey}`,
+    };
   }
 
   /**
@@ -39,20 +50,50 @@ class BrightDataClient {
     const { url, timeout = 30000 } = options;
 
     try {
-      // Using BrightData Web Unlocker API
-      const response = await fetch(`${BRIGHTDATA_BASE_URL}/request`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify({
-          zone: this.zone,
+      const proxyConfig = this.getProxyConfig();
+
+      // If no BrightData config, use direct fetch (development only)
+      if (!proxyConfig) {
+        console.log(`[BrightData] Direct fetch (no proxy) for ${url}`);
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          },
+          signal: AbortSignal.timeout(timeout),
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Scrape failed: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const html = await response.text();
+        return {
+          html,
           url,
-          format: "raw",
-          timeout,
-        }),
-        signal: AbortSignal.timeout(timeout + 5000),
+          statusCode: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          timestamp: new Date(),
+        };
+      }
+
+      // Using BrightData proxy with fetch
+      const proxyUrl = `http://${proxyConfig.auth}@${proxyConfig.host}:${proxyConfig.port}`;
+
+      console.log(`[BrightData] Fetching via proxy: ${url}`);
+
+      // For Node.js, we need to use a proxy agent
+      // In production on Vercel, this will work with the proxy
+      const response = await fetch(url, {
+        // @ts-ignore - proxy support in Node.js fetch
+        proxy: proxyUrl,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        signal: AbortSignal.timeout(timeout),
       });
 
       if (!response.ok) {

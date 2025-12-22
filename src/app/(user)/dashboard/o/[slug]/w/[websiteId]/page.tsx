@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AnalyzeButton } from "./_components/AnalyzeButton";
 import {
   ArrowLeft,
   BarChart3,
@@ -112,10 +113,17 @@ export default async function WebsitePage({ params }: PageProps) {
           </a>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" disabled={website.status === "analyzing"}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${website.status === "analyzing" ? "animate-spin" : ""}`} />
-            {website.status === "analyzing" ? "Analyse en cours..." : "Relancer l'analyse"}
+          <Button variant="outline" size="sm" asChild>
+            <a href={website.url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Voir le site
+            </a>
           </Button>
+          <AnalyzeButton
+            orgSlug={slug}
+            websiteId={websiteId}
+            isAnalyzing={website.status === "analyzing"}
+          />
         </div>
       </div>
 
