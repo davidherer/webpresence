@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { use } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
 import { CompetitorScore } from "./_components/CompetitorScore";
 import { OnboardingBanner } from "./_components/OnboardingBanner";
 import { GenerateQueriesDialog } from "./_components/GenerateQueriesDialog";
 import {
   ArrowLeft,
-  BarChart3,
-  Users2,
-  FileText,
-  Lightbulb,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -24,6 +27,7 @@ import {
   RefreshCw,
   AlertCircle,
   Sparkles,
+  Search,
 } from "lucide-react";
 
 interface PageProps {
@@ -92,11 +96,15 @@ const getTrendIcon = (trend: number | null) => {
 
 export default function WebsitePage({ params }: PageProps) {
   const { slug, websiteId } = use(params);
-  const router = useRouter();
   const [data, setData] = useState<WebsiteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  
+  // Filtres
+  const [queryFilter, setQueryFilter] = useState("");
+  const [competitorFilter, setCompetitorFilter] = useState("");
+  const [reportFilter, setReportFilter] = useState("");
 
   // Reload data function
   const reloadData = async () => {
@@ -131,6 +139,31 @@ export default function WebsitePage({ params }: PageProps) {
     loadData();
   }, [slug, websiteId]);
 
+  // Filtrage des données
+  const filteredQueries = useMemo(() => {
+    if (!data) return [];
+    return data.website.searchQueries.filter(q =>
+      q.query.toLowerCase().includes(queryFilter.toLowerCase()) ||
+      (q.description?.toLowerCase() || "").includes(queryFilter.toLowerCase())
+    );
+  }, [data, queryFilter]);
+
+  const filteredCompetitors = useMemo(() => {
+    if (!data) return [];
+    return data.website.competitors.filter(c =>
+      c.name.toLowerCase().includes(competitorFilter.toLowerCase()) ||
+      c.url.toLowerCase().includes(competitorFilter.toLowerCase())
+    );
+  }, [data, competitorFilter]);
+
+  const filteredReports = useMemo(() => {
+    if (!data) return [];
+    return data.website.aiReports.filter(r =>
+      r.title.toLowerCase().includes(reportFilter.toLowerCase()) ||
+      r.type.toLowerCase().includes(reportFilter.toLowerCase())
+    );
+  }, [data, reportFilter]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -157,42 +190,33 @@ export default function WebsitePage({ params }: PageProps) {
   const { website } = data;
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <Link
-        href={`/dashboard/o/${slug}`}
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="w-4 h-4 mr-1" />
-        Retour à l&apos;organisation
-      </Link>
-
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">{website.name}</h1>
-          <a
-            href={website.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+    <div className="w-full min-h-screen p-4">
+      {/* Header compact */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/dashboard/o/${slug}`}
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
-            {website.url}
-            <ExternalLink className="w-3 h-3" />
-          </a>
+            <ArrowLeft className="w-4 h-4 mr-1" />
+          </Link>
+          <div>
+            <h1 className="text-xl font-bold">{website.name}</h1>
+            <a
+              href={website.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+            >
+              {website.url}
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <a href={website.url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="w-4 h-4 mr-2" />
-              Voir le site
-            </a>
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowGenerateDialog(true)}
-          >
-            <Sparkles className="w-4 h-4 mr-2" />
-            Générer des requêtes
+          <Button variant="outline" size="sm" onClick={() => setShowGenerateDialog(true)}>
+            <Sparkles className="w-4 h-4 mr-1" />
+            Générer
           </Button>
           <AnalyzeButton
             orgSlug={slug}
@@ -202,7 +226,7 @@ export default function WebsitePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Onboarding banner for draft websites */}
+      {/* Onboarding banner */}
       {website.status === "draft" && (
         <OnboardingBanner
           orgSlug={slug}
@@ -212,15 +236,15 @@ export default function WebsitePage({ params }: PageProps) {
         />
       )}
 
-      {/* Status banner for analyzing websites */}
+      {/* Status banner */}
       {website.status === "analyzing" && (
-        <Card className="mb-8 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
-          <CardContent className="flex items-center gap-4 py-4">
-            <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+        <Card className="mb-4 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
+          <CardContent className="flex items-center gap-3 py-3">
+            <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
             <div>
-              <p className="font-medium">Analyse en cours</p>
-              <p className="text-sm text-muted-foreground">
-                Nous analysons votre site pour identifier les requêtes de recherche pertinentes. Cela peut prendre quelques minutes.
+              <p className="text-sm font-medium">Analyse en cours</p>
+              <p className="text-xs text-muted-foreground">
+                Identification des requêtes de recherche pertinentes en cours...
               </p>
             </div>
           </CardContent>
@@ -239,198 +263,242 @@ export default function WebsitePage({ params }: PageProps) {
         }}
       />
 
-      {/* Quick stats */}
-      <div className="grid gap-4 md:grid-cols-4 mb-8">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Requêtes de recherche</CardDescription>
-            <CardTitle className="text-3xl">{website.searchQueries.length}</CardTitle>
+      {/* Layout 3 colonnes */}
+      <div className="grid grid-cols-3 gap-4">
+        {/* Colonne 1: Requêtes */}
+        <Card className="h-[calc(100vh-180px)]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
+                Requêtes ({filteredQueries.length})
+              </CardTitle>
+              <Link href={`/dashboard/o/${slug}/w/${websiteId}/queries`}>
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  Tout voir
+                </Button>
+              </Link>
+            </div>
+            <div className="relative mt-2">
+              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrer..."
+                value={queryFilter}
+                onChange={(e) => setQueryFilter(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
           </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Concurrents suivis</CardDescription>
-            <CardTitle className="text-3xl">{website.competitors.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Rapports IA</CardDescription>
-            <CardTitle className="text-3xl">{website.aiReports.length}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Suggestions en attente</CardDescription>
-            <CardTitle className="text-3xl">
-              {website.searchQueries.reduce((acc, q) => acc + q._count.aiSuggestions, 0)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Search Queries section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
-              Requêtes de recherche
-            </h2>
-            <Link href={`/dashboard/o/${slug}/w/${websiteId}/queries`}>
-              <Button variant="ghost" size="sm">Voir tout</Button>
-            </Link>
-          </div>
-
-          {website.searchQueries.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                {website.status === "active"
-                  ? "Aucune requête identifiée. Relancez l'analyse ou ajoutez-en manuellement."
-                  : "Les requêtes seront identifiées automatiquement après l'analyse."}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {website.searchQueries.slice(0, 5).map((searchQuery) => {
-                const latestPosition = searchQuery.serpResults[0]?.position;
-                const trend = getTrend(searchQuery.serpResults);
-
-                return (
-                  <Link key={searchQuery.id} href={`/dashboard/o/${slug}/w/${websiteId}/queries/${searchQuery.id}`}>
-                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                      <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{searchQuery.query}</p>
-                            {searchQuery.description && (
-                              <p className="text-sm text-muted-foreground truncate">
-                                {searchQuery.description}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-4">
-                            {searchQuery._count.aiSuggestions > 0 && (
-                              <div className="flex items-center gap-1 text-amber-500">
-                                <Lightbulb className="w-4 h-4" />
-                                <span className="text-sm">{searchQuery._count.aiSuggestions}</span>
+          <CardContent className="p-0">
+            <div className="overflow-auto h-[calc(100vh-280px)]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[60%]">Requête</TableHead>
+                    <TableHead className="text-center">Position</TableHead>
+                    <TableHead className="text-center w-[60px]">Trend</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredQueries.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                        {queryFilter ? "Aucun résultat" : "Aucune requête"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredQueries.map((query) => {
+                      const latestPosition = query.serpResults[0]?.position;
+                      const trend = getTrend(query.serpResults);
+                      return (
+                        <TableRow
+                          key={query.id}
+                          className="cursor-pointer"
+                          onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/queries/${query.id}`}
+                        >
+                          <TableCell className="py-2">
+                            <div className="text-xs font-medium truncate">{query.query}</div>
+                            {query.description && (
+                              <div className="text-xs text-muted-foreground truncate">
+                                {query.description}
                               </div>
                             )}
-                            <div className="flex items-center gap-2">
-                              {getTrendIcon(trend)}
-                              <span className="text-lg font-semibold">
-                                {latestPosition !== null && latestPosition !== undefined && latestPosition > 0
-                                  ? `#${latestPosition}`
-                                  : searchQuery.serpResults.length > 0
-                                    ? <span className="text-orange-500">Absent</span>
-                                    : "-"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                );
-              })}
+                          </TableCell>
+                          <TableCell className="text-center py-2">
+                            <span className="text-xs font-semibold">
+                              {latestPosition !== null && latestPosition !== undefined && latestPosition > 0
+                                ? `#${latestPosition}`
+                                : query.serpResults.length > 0
+                                  ? <span className="text-orange-500">-</span>
+                                  : "-"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center py-2">
+                            {getTrendIcon(trend)}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Competitors section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold flex items-center gap-2">
-              <Users2 className="w-5 h-5" />
-              Concurrents
-            </h2>
-            <Link href={`/dashboard/o/${slug}/w/${websiteId}/competitors`}>
-              <Button variant="ghost" size="sm">Voir tout</Button>
-            </Link>
-          </div>
-
-          {website.competitors.length === 0 ? (
-            <Card className="border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Les concurrents seront détectés automatiquement lors de l&apos;analyse SERP.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {website.competitors.slice(0, 5).map((competitor) => (
-                  <Link key={competitor.id} href={`/dashboard/o/${slug}/w/${websiteId}/competitors/${competitor.id}`}>
-                    <Card className="hover:border-primary/50 transition-colors cursor-pointer">
-                      <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{competitor.name}</p>
-                            <p className="text-sm text-muted-foreground truncate max-w-xs">
-                              {competitor.url}
-                            </p>
-                          </div>
+        {/* Colonne 2: Concurrents */}
+        <Card className="h-[calc(100vh-180px)]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
+                Concurrents ({filteredCompetitors.length})
+              </CardTitle>
+              <Link href={`/dashboard/o/${slug}/w/${websiteId}/competitors`}>
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  Tout voir
+                </Button>
+              </Link>
+            </div>
+            <div className="relative mt-2">
+              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrer..."
+                value={competitorFilter}
+                onChange={(e) => setCompetitorFilter(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-auto h-[calc(100vh-280px)]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead className="text-center w-[80px]">Score</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCompetitors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                        {competitorFilter ? "Aucun résultat" : "Aucun concurrent"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredCompetitors.map((competitor) => (
+                      <TableRow
+                        key={competitor.id}
+                        className="cursor-pointer"
+                        onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/competitors/${competitor.id}`}
+                      >
+                        <TableCell className="py-2">
+                          <div className="text-xs font-medium">{competitor.name}</div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <a
+                            href={competitor.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 truncate"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {competitor.url.replace(/^https?:\/\/(www\.)?/, '')}
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </TableCell>
+                        <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
                           <CompetitorScore
                             orgSlug={slug}
                             websiteId={websiteId}
                             competitorId={competitor.id}
                             competitorUrl={competitor.url}
                           />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </div>
-      </div>
+          </CardContent>
+        </Card>
 
-      {/* Reports section */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Rapports IA
-          </h2>
-          <Link href={`/dashboard/o/${slug}/w/${websiteId}/reports`}>
-            <Button variant="ghost" size="sm">Voir tout</Button>
-          </Link>
-        </div>
-
-        {website.aiReports.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center text-muted-foreground">
-              Les rapports seront générés après l&apos;analyse initiale.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {website.aiReports.map((report) => (
-              <Link key={report.id} href={`/dashboard/o/${slug}/w/${websiteId}/reports/${report.id}`}>
-                <Card className="hover:border-primary/50 transition-colors cursor-pointer h-full">
-                  <CardHeader>
-                    <CardDescription>
-                      {report.type === "initial_analysis"
-                        ? "Analyse initiale"
-                        : report.type === "periodic_recap"
-                        ? "Récap périodique"
-                        : "Analyse concurrentielle"}
-                    </CardDescription>
-                    <CardTitle className="text-base">{report.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(report.createdAt).toLocaleDateString("fr-FR", {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </CardContent>
-                </Card>
+        {/* Colonne 3: Rapports */}
+        <Card className="h-[calc(100vh-180px)]">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">
+                Rapports ({filteredReports.length})
+              </CardTitle>
+              <Link href={`/dashboard/o/${slug}/w/${websiteId}/reports`}>
+                <Button variant="ghost" size="sm" className="h-7 text-xs">
+                  Tout voir
+                </Button>
               </Link>
-            ))}
-          </div>
-        )}
+            </div>
+            <div className="relative mt-2">
+              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Filtrer..."
+                value={reportFilter}
+                onChange={(e) => setReportFilter(e.target.value)}
+                className="pl-8 h-8 text-xs"
+              />
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-auto h-[calc(100vh-280px)]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Titre</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredReports.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                        {reportFilter ? "Aucun résultat" : "Aucun rapport"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredReports.map((report) => (
+                      <TableRow
+                        key={report.id}
+                        className="cursor-pointer"
+                        onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/reports/${report.id}`}
+                      >
+                        <TableCell className="py-2">
+                          <span className="text-xs">
+                            {report.type === "initial_analysis"
+                              ? "Initial"
+                              : report.type === "periodic_recap"
+                              ? "Périodique"
+                              : "Concurrent"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <div className="text-xs font-medium truncate">{report.title}</div>
+                        </TableCell>
+                        <TableCell className="py-2">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">
+                            {new Date(report.createdAt).toLocaleDateString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
