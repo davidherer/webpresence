@@ -13,7 +13,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, Loader2, RefreshCw, CheckCircle2, Circle, Globe, History, Plus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Search, Loader2, RefreshCw, CheckCircle2, Circle, Globe, History, Plus, MoreVertical } from "lucide-react";
 import { SitemapSelectionDialog } from "./SitemapSelectionDialog";
 import { SitemapDiffViewer } from "./SitemapDiffViewer";
 
@@ -248,50 +255,34 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
               </Button>
             )}
             {totalCount > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={handleExtractAll}
-                  disabled={addingToExtractions}
-                >
-                  {addingToExtractions ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <Plus className="w-3 h-3 mr-1" />
-                  )}
-                  Tout extraire
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setShowDiffViewer(true)}
-                >
-                  <History className="w-3 h-3" />
-                </Button>
-              </>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={addingToExtractions || analyzing}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExtractAll}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Tout extraire
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleAnalyze}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Analyser sitemap
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowDiffViewer(true)}>
+                    <History className="w-4 h-4 mr-2" />
+                    Historique
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={handleAnalyze}
-              disabled={analyzing}
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  Analyse...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-3 h-3 mr-1" />
-                  Analyser
-                </>
-              )}
-            </Button>
           </div>
         </div>
         {lastFetch && (
