@@ -323,6 +323,8 @@ RÉPONDS EN JSON:
   return result.keywords || [];
 }
 
+export const mistralClient = client;
+
 export const mistral = {
   identifySearchQueries,
   generatePeriodicRecap,

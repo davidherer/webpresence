@@ -1,1 +1,1 @@
-export { mistral } from "./client";
+export { mistral, mistralClient } from "./client";

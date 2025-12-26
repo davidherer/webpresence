@@ -13,6 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Search,
   Loader2,
   CheckCircle2,
@@ -21,6 +28,8 @@ import {
   Zap,
   Layers,
   RefreshCw,
+  MoreVertical,
+  Sparkles,
 } from "lucide-react";
 import {
   Select,
@@ -30,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { GeneratePageQueriesDialog } from "./GeneratePageQueriesDialog";
 
 interface PageExtraction {
   id: string;
@@ -68,6 +78,7 @@ export function ExtractionsColumn({
 
   // Sélection
   const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+  const [showGenerateQueriesDialog, setShowGenerateQueriesDialog] = useState(false);
 
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -305,36 +316,38 @@ export function ExtractionsColumn({
           </CardTitle>
           <div className="flex gap-1">
             {selectedUrls.size > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleExtractSelected("quick")}
-                disabled={extracting}
-                className="text-xs"
-              >
-                {extracting ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <Zap className="w-3 h-3 mr-1" />
-                )}
-                Rapide ({selectedUrls.size})
-              </Button>
-            )}
-            {selectedUrls.size > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleExtractSelected("full")}
-                disabled={extracting}
-                className="text-xs"
-              >
-                {extracting ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <Layers className="w-3 h-3 mr-1" />
-                )}
-                Complet ({selectedUrls.size})
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={extracting}
+                  >
+                    {extracting ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <MoreVertical className="w-3 h-3 mr-1" />
+                    )}
+                    Actions ({selectedUrls.size})
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExtractSelected("quick")}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Extraction rapide
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExtractSelected("full")}>
+                    <Layers className="w-4 h-4 mr-2" />
+                    Extraction complète
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowGenerateQueriesDialog(true)}>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Générer requêtes SEO
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             {oldExtractions.length > 0 && selectedUrls.size === 0 && (
               <Button
@@ -472,6 +485,13 @@ export function ExtractionsColumn({
           {hasMore && <div ref={loadMoreRef} className="h-10" />}
         </div>
       </CardContent>
+
+      <GeneratePageQueriesDialog
+        isOpen={showGenerateQueriesDialog}
+        onClose={() => setShowGenerateQueriesDialog(false)}
+        selectedUrls={Array.from(selectedUrls)}
+        websiteId={websiteId}
+      />
     </Card>
   );
 }
