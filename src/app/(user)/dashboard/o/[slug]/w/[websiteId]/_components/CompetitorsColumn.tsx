@@ -73,14 +73,13 @@ export function CompetitorsColumn({ competitors, orgSlug, websiteId }: Competito
             <TableHeader>
               <TableRow>
                 <TableHead>Nom</TableHead>
-                <TableHead>URL</TableHead>
                 <TableHead className="text-center w-[80px]">Score</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCompetitors.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                  <TableCell colSpan={2} className="text-center text-xs text-muted-foreground py-8">
                     {filter ? "Aucun résultat" : "Aucun concurrent"}
                   </TableCell>
                 </TableRow>
@@ -91,22 +90,10 @@ export function CompetitorsColumn({ competitors, orgSlug, websiteId }: Competito
                     className="cursor-pointer"
                     onClick={() => window.location.href = `/dashboard/o/${orgSlug}/w/${websiteId}/competitors/${competitor.id}`}
                   >
-                    <TableCell className="py-2">
+                    <TableCell className="py-1.5">
                       <div className="text-xs font-medium">{competitor.name}</div>
                     </TableCell>
-                    <TableCell className="py-2">
-                      <a
-                        href={competitor.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 truncate"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {competitor.url.replace(/^https?:\/\/(www\.)?/, '')}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </TableCell>
-                    <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
+                    <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <CompetitorScore
                         orgSlug={orgSlug}
                         websiteId={websiteId}

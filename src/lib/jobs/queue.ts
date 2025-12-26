@@ -277,7 +277,6 @@ async function processJob(
       return { success: false, error: "Missing report type" };
 
     default:
-
       return { success: false, error: `Unknown job type: ${type}` };
   }
 }
@@ -351,7 +350,6 @@ export async function processJobQueue(): Promise<{
         failed++;
       }
     } catch (error) {
-
       // Mark as failed (might retry if under max attempts)
       const shouldRetry = job.attempts + 1 < job.maxAttempts;
 
