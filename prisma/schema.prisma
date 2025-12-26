@@ -163,6 +163,7 @@ model Website {
   searchQueries    SearchQuery[]
   competitors      Competitor[]
   pageAnalyses     PageAnalysis[]
+  pageExtractions  PageExtraction[]
   aiReports        AIReport[]
   analysisJobs     AnalysisJob[]
   sitemapSnapshots SitemapSnapshot[]
@@ -304,6 +305,44 @@ model PageAnalysis {
   @@index([websiteId])
   @@index([url])
   @@index([createdAt])
+}
+
+// ==========================================
+// PAGE EXTRACTION (User-triggered structured extraction)
+// ==========================================
+
+model PageExtraction {
+  id        String   @id @default(cuid())
+  websiteId String
+  url       String
+  source    String   @default("manual") // manual, sitemap, gsc
+  type      String?  // quick, full, null if not yet extracted
+  status    String   @default("pending") // pending, extracting, completed, failed
+  
+  // Quick extraction fields
+  title           String?
+  metaDescription String?
+  h1              String[]         @default([])
+  
+  // Full extraction fields (JSON for complex data)
+  headings Json? // { h2: [], h3: [], h4: [], h5: [], h6: [] }
+  keywords Json? // [{ keyword: string, frequency: number, density: number }]
+  
+  // HTML storage
+  htmlBlobUrl String?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  extractedAt DateTime? // When extraction was completed
+  error       String?
+  
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([url])
+  @@index([status])
+  @@index([type])
+  @@index([extractedAt])
 }
 
 model CompetitorPageAnalysis {

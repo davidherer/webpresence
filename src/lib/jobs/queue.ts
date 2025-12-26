@@ -159,6 +159,83 @@ async function processJob(
       }
       return { success: false, error: "No URLs provided" };
 
+    case "page_extraction":
+      console.log(`      → Extraction de page`);
+      console.log(
+        `      → Type: ${payload.extractionType}, URL: ${payload.url}`
+      );
+
+      if (!payload.extractionId || !payload.url || !payload.extractionType) {
+        console.log(`      ✗ Paramètres manquants pour l'extraction`);
+        return {
+          success: false,
+          error: "Missing extractionId, url or extractionType",
+        };
+      }
+
+      try {
+        // Import module d'extraction
+        const { extractPage } = await import("@/lib/extraction");
+
+        // Effectuer l'extraction
+        const extractionResult = await extractPage(
+          websiteId,
+          payload.url,
+          payload.extractionType
+        );
+
+        console.log(`      ✓ Extraction réussie pour ${payload.url}`);
+
+        // Mettre à jour l'enregistrement PageExtraction
+        const updateData: any = {
+          status: "completed",
+          type: payload.extractionType,
+          htmlBlobUrl: extractionResult.htmlBlobUrl,
+          extractedAt: new Date(),
+          error: null,
+        };
+
+        // Ajouter les données selon le type d'extraction
+        if (payload.extractionType === "quick" && extractionResult.quick) {
+          updateData.title = extractionResult.quick.title;
+          updateData.metaDescription = extractionResult.quick.metaDescription;
+          updateData.h1 = extractionResult.quick.h1;
+        } else if (payload.extractionType === "full" && extractionResult.full) {
+          updateData.title = extractionResult.full.title;
+          updateData.metaDescription = extractionResult.full.metaDescription;
+          updateData.h1 = extractionResult.full.h1;
+          updateData.headings = extractionResult.full.headings;
+          updateData.keywords = extractionResult.full.keywords;
+        }
+
+        await prisma.pageExtraction.update({
+          where: { id: payload.extractionId },
+          data: updateData,
+        });
+
+        console.log(
+          `      ✓ PageExtraction mise à jour: ${payload.extractionId.substring(0, 8)}...`
+        );
+
+        return {
+          success: true,
+          data: { extractionId: payload.extractionId },
+        };
+      } catch (err: any) {
+        console.error(`      ✗ Erreur d'extraction:`, err);
+
+        // Mettre à jour avec l'erreur
+        await prisma.pageExtraction.update({
+          where: { id: payload.extractionId },
+          data: {
+            status: "failed",
+            error: err.message || "Unknown error",
+          },
+        });
+
+        return { success: false, error: err.message };
+      }
+
     case "serp_analysis":
       console.log(
         `[JobQueue processJob] SERP analysis - searchQueryId: ${

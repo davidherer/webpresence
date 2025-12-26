@@ -144,6 +144,7 @@ export type AISuggestionStatus = "pending" | "accepted" | "dismissed";
 export type AnalysisJobType =
   | "sitemap_fetch"
   | "page_scrape"
+  | "page_extraction"
   | "serp_analysis"
   | "ai_report"
   | "initial_analysis";
@@ -152,11 +153,16 @@ export type AnalysisJobStatus = "pending" | "running" | "completed" | "failed";
 
 export interface JobPayload {
   urls?: string[];
+  url?: string;
   query?: string;
   queries?: string[];
   searchQueryId?: string;
   competitorId?: string;
   reportType?: AIReportType;
+  extractionId?: string;
+  extractionType?: "quick" | "full";
+  websiteUrl?: string;
+  selectedSitemaps?: string[];
 }
 
 // ==========================================

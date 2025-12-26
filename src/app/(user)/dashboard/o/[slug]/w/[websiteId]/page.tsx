@@ -6,12 +6,12 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
-import { OnboardingBanner } from "./_components/OnboardingBanner";
 import { GenerateQueriesDialog } from "./_components/GenerateQueriesDialog";
 import { QueriesColumn } from "./_components/QueriesColumn";
 import { CompetitorsColumn } from "./_components/CompetitorsColumn";
 import { ReportsColumn } from "./_components/ReportsColumn";
 import { SitemapColumn } from "./_components/SitemapColumn";
+import { ExtractionsColumn } from "./_components/ExtractionsColumn";
 import {
   ArrowLeft,
   ExternalLink,
@@ -197,7 +197,7 @@ export default function WebsitePage({ params }: PageProps) {
         }}
       />
 
-      {/* Layout 4 colonnes avec scroll horizontal */}
+      {/* Layout 5 colonnes avec scroll horizontal */}
       <div className="overflow-x-auto">
         <div className="flex gap-4 min-w-max">
           <div className="w-[400px] flex-shrink-0">
@@ -205,6 +205,11 @@ export default function WebsitePage({ params }: PageProps) {
               orgSlug={slug} 
               websiteId={websiteId}
               websiteUrl={website.url}
+            />
+          </div>
+          <div className="w-[400px] flex-shrink-0">
+            <ExtractionsColumn 
+              websiteId={websiteId}
             />
           </div>
           <div className="w-[400px] flex-shrink-0">
