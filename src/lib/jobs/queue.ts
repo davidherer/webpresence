@@ -296,6 +296,69 @@ async function processJob(
         return { success: false, error: err.message };
       }
 
+    case "competitor_page_extraction":
+      if (!payload.extractionId || !payload.url || !payload.extractionType) {
+        return {
+          success: false,
+          error: "Missing extractionId, url or extractionType",
+        };
+      }
+
+      try {
+        // Import module d'extraction
+        const { extractPage } = await import("@/lib/extraction");
+
+        // Mettre à jour le statut
+        await prisma.competitorPageExtraction.update({
+          where: { id: payload.extractionId },
+          data: { status: "extracting" },
+        });
+
+        // Effectuer l'extraction
+        const extractionResult = await extractPage(
+          websiteId,
+          payload.url,
+          payload.extractionType
+        );
+
+        // Mettre à jour l'enregistrement CompetitorPageExtraction
+        const updateData: any = {
+          status: "completed",
+          type: payload.extractionType,
+          htmlBlobUrl: extractionResult.htmlBlobUrl,
+          extractedAt: new Date(),
+        };
+
+        if (payload.extractionType === "full" && extractionResult.full) {
+          updateData.title = extractionResult.full.title;
+          updateData.metaDescription = extractionResult.full.metaDescription;
+          updateData.h1 = extractionResult.full.h1;
+          updateData.headings = extractionResult.full.headings;
+          updateData.keywords = extractionResult.full.keywords;
+        }
+
+        await prisma.competitorPageExtraction.update({
+          where: { id: payload.extractionId },
+          data: updateData,
+        });
+
+        return {
+          success: true,
+          data: { extractionId: payload.extractionId },
+        };
+      } catch (err: any) {
+        // Mettre à jour avec l'erreur
+        await prisma.competitorPageExtraction.update({
+          where: { id: payload.extractionId },
+          data: {
+            status: "failed",
+            error: err.message || "Unknown error",
+          },
+        });
+
+        return { success: false, error: err.message };
+      }
+
     case "serp_analysis":
       if (payload.searchQueryId && payload.query) {
         const serpResult = await serp.runSerpAnalysis(

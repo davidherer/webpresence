@@ -49,7 +49,7 @@ export const POST = withUserAuth(
     });
 
     let clientDomain: string | null = null;
-    
+
     if (website?.url) {
       try {
         clientDomain = new URL(
@@ -73,7 +73,7 @@ export const POST = withUserAuth(
         );
       }
 
-      // Récupérer les résultats SERP pour les requêtes sélectionnées (top 10 uniquement)
+      // Récupérer les résultats SERP pour les requêtes sélectionnées (avec les données brutes)
       const serpResults = await prisma.serpResult.findMany({
         where: {
           searchQueryId: {
@@ -82,23 +82,20 @@ export const POST = withUserAuth(
           searchQuery: {
             websiteId,
           },
-          url: {
+          rawDataBlobUrl: {
             not: null,
-          },
-          position: {
-            not: null,
-            lte: 10,
           },
         },
         select: {
           id: true,
-          url: true,
-          position: true,
           searchQueryId: true,
-          title: true,
+          rawDataBlobUrl: true,
         },
-        orderBy: [{ searchQueryId: "asc" }, { position: "asc" }],
+        orderBy: { createdAt: "desc" },
+        take: queryIds.length, // Un résultat SERP par requête (le plus récent)
       });
+
+      console.log("SERP Results found:", serpResults.length);
 
       if (serpResults.length === 0) {
         return NextResponse.json(
@@ -107,40 +104,86 @@ export const POST = withUserAuth(
         );
       }
 
-      // Filtrer pour ne garder que les URLs concurrentes (exclure le domaine client si défini)
-      const competitorResults = serpResults.filter((result) => {
-        if (!result.url) return false;
-        if (!clientDomain) return true; // Si pas de domaine client, garder tout
-        try {
-          const resultDomain = new URL(result.url).hostname;
-          return resultDomain !== clientDomain;
-        } catch {
-          return false;
-        }
-      });
+      // Extraire toutes les URLs des résultats SERP (top 10)
+      const extractionsToCreate: Array<{
+        searchQueryId: string;
+        url: string;
+        position: number;
+        status: "pending";
+        type: "quick";
+        title: string | null;
+      }> = [];
 
-      if (competitorResults.length === 0) {
+      for (const serpResult of serpResults) {
+        if (!serpResult.rawDataBlobUrl) continue;
+
+        try {
+          // Récupérer les données brutes du SERP depuis le blob
+          const blobResponse = await fetch(serpResult.rawDataBlobUrl);
+          const serpData = await blobResponse.json();
+
+          console.log("SERP Data keys:", Object.keys(serpData));
+          
+          // Extraire les résultats organiques
+          const organicResults =
+            serpData.results || serpData.organic || serpData.organic_results || [];
+
+          console.log("Organic results found:", organicResults.length);
+          if (organicResults.length > 0) {
+            console.log("First organic result:", organicResults[0]);
+          }
+
+          for (const result of organicResults.slice(0, 10)) {
+            const url = result.link || result.url;
+            const position = result.position;
+            const title = result.title;
+
+            console.log(`Processing result - URL: ${url}, Position: ${position}`);
+
+            if (!url || !position) continue;
+
+            // Exclure le domaine client si défini
+            if (clientDomain) {
+              try {
+                const resultDomain = new URL(url).hostname;
+                console.log(`Comparing domains - Result: ${resultDomain}, Client: ${clientDomain}`);
+                if (resultDomain === clientDomain) {
+                  console.log("Skipping client domain");
+                  continue;
+                }
+              } catch {
+                console.log("Invalid URL, skipping");
+                continue;
+              }
+            }
+
+            extractionsToCreate.push({
+              searchQueryId: serpResult.searchQueryId,
+              url,
+              position,
+              status: "pending",
+              type: "quick",
+              title,
+            });
+          }
+        } catch (error) {
+          console.error(
+            `Failed to process SERP data for ${serpResult.id}:`,
+            error
+          );
+        }
+      }
+
+      console.log("Extractions to create:", extractionsToCreate.length);
+
+      if (extractionsToCreate.length === 0) {
         return NextResponse.json(
-          { error: clientDomain 
-            ? "Aucune page concurrente trouvée dans les résultats SERP" 
-            : "Aucun résultat SERP avec URL valide trouvé" },
+          {
+            error: "Aucune page concurrente trouvée dans les résultats SERP",
+          },
           { status: 404 }
         );
       }
-
-      // Créer les extractions concurrentes
-      const extractionsToCreate = competitorResults
-        .filter((result) => result.url && result.position)
-        .map((result) => {
-          return {
-            searchQueryId: result.searchQueryId,
-            url: result.url!,
-            position: result.position,
-            status: "pending" as const,
-            type: "quick" as const,
-            title: result.title,
-          };
-        });
 
       // Vérifier les extractions existantes pour éviter les doublons
       const existingExtractions =
@@ -176,17 +219,40 @@ export const POST = withUserAuth(
       }
 
       // Créer les nouvelles extractions
-      const created = await prisma.competitorPageExtraction.createMany({
-        data: newExtractions,
-        skipDuplicates: true,
-      });
+      const createdExtractions = [];
+      for (const extraction of newExtractions) {
+        const created = await prisma.competitorPageExtraction.create({
+          data: extraction,
+        });
+        createdExtractions.push(created);
+      }
+
+      // Créer les jobs d'extraction
+      const jobs = createdExtractions.map((extraction) => ({
+        websiteId,
+        type: "competitor_page_extraction" as const,
+        status: "pending" as const,
+        priority: 5,
+        payload: {
+          extractionId: extraction.id,
+          url: extraction.url,
+          extractionType: extraction.type,
+        },
+      }));
+
+      if (jobs.length > 0) {
+        await prisma.analysisJob.createMany({
+          data: jobs,
+        });
+      }
 
       return NextResponse.json({
-        message: `${created.count} extraction${
-          created.count > 1 ? "s" : ""
-        } créée${created.count > 1 ? "s" : ""}`,
-        count: created.count,
+        message: `${createdExtractions.length} extraction${
+          createdExtractions.length > 1 ? "s" : ""
+        } créée${createdExtractions.length > 1 ? "s" : ""}`,
+        count: createdExtractions.length,
         skipped: extractionsToCreate.length - newExtractions.length,
+        jobsCreated: jobs.length,
       });
     } catch (error) {
       console.error("Error creating extractions:", error);

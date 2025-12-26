@@ -146,6 +146,7 @@ export type AnalysisJobType =
   | "competitor_sitemap_fetch"
   | "page_scrape"
   | "page_extraction"
+  | "competitor_page_extraction"
   | "serp_analysis"
   | "ai_report"
   | "initial_analysis";
