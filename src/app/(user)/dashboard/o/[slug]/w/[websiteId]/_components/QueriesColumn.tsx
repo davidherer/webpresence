@@ -233,7 +233,7 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
                 size="sm"
                 className="h-7 text-xs"
                 onClick={analyzeSelected}
-                disabled={analyzing || cleaning}
+                disabled={analyzing || cleaning || extracting}
               >
                 <RefreshCw className={`w-3 h-3 mr-1 ${analyzing ? 'animate-spin' : ''}`} />
                 {analyzing ? "Analyse..." : "Analyser"}
@@ -244,7 +244,7 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
                     variant="outline"
                     size="sm"
                     className="h-7 w-7 p-0"
-                    disabled={analyzing || cleaning}
+                    disabled={analyzing || cleaning || extracting}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
@@ -253,6 +253,10 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
                   <DropdownMenuItem onClick={analyzeSelected} disabled={analyzing}>
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Analyser la sélection
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={extractSerpPages} disabled={extracting}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Extraire pages concurrentes
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={cleanSelected} disabled={cleaning} className="text-destructive">
