@@ -238,22 +238,22 @@ export function ExtractionsColumn({
       return <span className="text-xs text-gray-400 italic">Non extrait</span>;
     return (
       <span
-        className={`text-xs px-1.5 py-0.5 rounded ${
+        className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded whitespace-nowrap ${
           type === "quick"
             ? "bg-blue-100 text-blue-700"
             : "bg-purple-100 text-purple-700"
         }`}
       >
         {type === "quick" ? (
-          <span className="flex items-center gap-1">
+          <>
             <Zap className="w-3 h-3" />
             Rapide
-          </span>
+          </>
         ) : (
-          <span className="flex items-center gap-1">
+          <>
             <Layers className="w-3 h-3" />
             Complet
-          </span>
+          </>
         )}
       </span>
     );
