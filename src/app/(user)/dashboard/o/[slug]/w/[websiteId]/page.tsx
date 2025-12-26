@@ -170,16 +170,6 @@ export default function WebsitePage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Onboarding banner */}
-      {website.status === "draft" && (
-        <OnboardingBanner
-          orgSlug={slug}
-          websiteId={websiteId}
-          websiteUrl={website.url}
-          onDismiss={reloadData}
-        />
-      )}
-
       {/* Status banner */}
       {website.status === "analyzing" && (
         <Card className="mb-4 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
