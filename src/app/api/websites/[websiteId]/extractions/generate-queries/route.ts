@@ -12,7 +12,7 @@ interface GeneratedQuery {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { websiteId: string } }
+  { params }: { params: Promise<{ websiteId: string }> }
 ) {
   try {
     const session = await getUserSession();
@@ -20,7 +20,7 @@ export async function POST(
       return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
     }
 
-    const { websiteId } = params;
+    const { websiteId } = await params;
     const { urls, intentType, competitionLevel } = await req.json();
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
@@ -83,7 +83,10 @@ export async function POST(
     const context = extractions
       .map((ext) => {
         const headingsData = ext.headings as Record<string, string[]> | null;
-        const keywordsData = ext.keywords as Array<{ keyword: string; frequency: number }> | null;
+        const keywordsData = ext.keywords as Array<{
+          keyword: string;
+          frequency: number;
+        }> | null;
 
         return `
 URL: ${ext.url}
@@ -116,8 +119,7 @@ Mots-clés: ${keywordsData ? JSON.stringify(keywordsData).slice(0, 200) : "N/A"}
           "Concentrez-vous sur les requêtes transactionnelles (acheter, télécharger, s'inscrire, commander).";
         break;
       default:
-        intentInstruction =
-          "Incluez tous les types d'intentions de recherche.";
+        intentInstruction = "Incluez tous les types d'intentions de recherche.";
     }
 
     let competitionInstruction = "";
@@ -178,7 +180,7 @@ Réponds UNIQUEMENT avec un tableau JSON valide au format suivant:
     });
 
     const content = chatResponse.choices?.[0]?.message?.content;
-    
+
     if (!content || typeof content !== "string") {
       return NextResponse.json(
         { error: "Réponse invalide de l'IA" },

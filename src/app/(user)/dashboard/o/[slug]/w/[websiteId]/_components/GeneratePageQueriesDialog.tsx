@@ -26,8 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle, Plus } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface GeneratedQuery {
   query: string;
@@ -54,6 +55,9 @@ export function GeneratePageQueriesDialog({
   const [competitionLevel, setCompetitionLevel] = useState<string>("all");
   const [queries, setQueries] = useState<GeneratedQuery[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
+  const [adding, setAdding] = useState(false);
+  const [addSuccess, setAddSuccess] = useState(false);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -92,6 +96,68 @@ export function GeneratePageQueriesDialog({
   const handleReset = () => {
     setQueries([]);
     setError(null);
+    setSelectedQueries(new Set());
+    setAddSuccess(false);
+  };
+
+  const handleToggleQuery = (query: string) => {
+    setSelectedQueries((prev) => {
+      const next = new Set(prev);
+      if (next.has(query)) {
+        next.delete(query);
+      } else {
+        next.add(query);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleAll = () => {
+    if (selectedQueries.size === queries.length) {
+      setSelectedQueries(new Set());
+    } else {
+      setSelectedQueries(new Set(queries.map((q) => q.query)));
+    }
+  };
+
+  const handleAddToTracking = async () => {
+    if (selectedQueries.size === 0) return;
+
+    setAdding(true);
+    try {
+      const selectedQueriesData = queries.filter((q) =>
+        selectedQueries.has(q.query)
+      );
+
+      const response = await fetch(`/api/websites/${websiteId}/queries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          queries: selectedQueriesData.map((q) => ({
+            query: q.query,
+            competitionLevel: q.competition.toUpperCase(),
+            confidence: q.relevance / 10,
+            tags: [q.intent],
+          })),
+        }),
+      });
+
+      if (response.ok) {
+        setAddSuccess(true);
+        setSelectedQueries(new Set());
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        const data = await response.json();
+        setError(data.error || "Erreur lors de l'ajout");
+      }
+    } catch (err) {
+      console.error("Failed to add queries:", err);
+      setError("Erreur de connexion");
+    } finally {
+      setAdding(false);
+    }
   };
 
   const getIntentLabel = (intent: string) => {
@@ -144,7 +210,7 @@ export function GeneratePageQueriesDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-175 max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
@@ -160,7 +226,7 @@ export function GeneratePageQueriesDialog({
         {queries.length === 0 ? (
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="intent">Type d'intention</Label>
+              <Label htmlFor="intent">Type d&apos;intention</Label>
               <Select value={intentType} onValueChange={setIntentType}>
                 <SelectTrigger id="intent">
                   <SelectValue placeholder="Sélectionner un type" />
@@ -168,10 +234,10 @@ export function GeneratePageQueriesDialog({
                 <SelectContent>
                   <SelectItem value="all">Tous types</SelectItem>
                   <SelectItem value="informational">
-                    Informationnelles (recherche d'info)
+                    Informationnelles (recherche d&apos;info)
                   </SelectItem>
                   <SelectItem value="commercial">
-                    Commerciales (intention d'achat)
+                    Commerciales (intention d&apos;achat)
                   </SelectItem>
                   <SelectItem value="navigational">
                     Navigationnelles (trouver un site)
@@ -182,7 +248,7 @@ export function GeneratePageQueriesDialog({
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Filtrez par type d'intention de recherche
+                Filtrez par type d&apos;intention de recherche
               </p>
             </div>
 
@@ -215,15 +281,15 @@ export function GeneratePageQueriesDialog({
 
             <div className="rounded-lg bg-blue-50 dark:bg-blue-950 p-3">
               <p className="text-sm text-blue-900 dark:text-blue-100">
-                💡 L'IA analysera le contenu extrait (titre, meta, headings,
-                keywords) pour suggérer des requêtes pertinentes selon vos
-                critères.
+                💡 L&apos;IA analysera le contenu extrait (titre, meta,
+                headings, keywords) pour suggérer des requêtes pertinentes
+                selon vos critères.
               </p>
             </div>
 
             {error && (
               <div className="rounded-lg bg-red-50 dark:bg-red-950 p-3 flex items-start gap-2">
-                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                 <p className="text-sm text-red-900 dark:text-red-100">
                   {error}
                 </p>
@@ -232,21 +298,48 @@ export function GeneratePageQueriesDialog({
           </div>
         ) : (
           <div className="flex-1 overflow-hidden">
-            <div className="rounded-lg bg-green-50 dark:bg-green-950 p-3 flex items-start gap-2 mb-4">
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
-              <p className="text-sm text-green-900 dark:text-green-100">
-                Génération terminée ! Voici les requêtes suggérées.
-              </p>
-            </div>
+            {!addSuccess ? (
+              <div className="rounded-lg bg-green-50 dark:bg-green-950 p-3 flex items-start gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm text-green-900 dark:text-green-100">
+                    Génération terminée ! Sélectionnez les requêtes à ajouter
+                    au suivi.
+                  </p>
+                  {selectedQueries.size > 0 && (
+                    <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                      {selectedQueries.size} requête(s) sélectionnée(s)
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-green-50 dark:bg-green-950 p-3 flex items-start gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-green-900 dark:text-green-100">
+                  ✅ Requêtes ajoutées avec succès ! Rechargement...
+                </p>
+              </div>
+            )}
 
-            <ScrollArea className="h-[400px] rounded-md border">
+            <ScrollArea className="h-100 rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={
+                          selectedQueries.size > 0 &&
+                          selectedQueries.size === queries.length
+                        }
+                        onCheckedChange={handleToggleAll}
+                        aria-label="Tout sélectionner"
+                      />
+                    </TableHead>
                     <TableHead>Requête</TableHead>
-                    <TableHead className="w-[100px]">Intention</TableHead>
-                    <TableHead className="w-[120px]">Concurrence</TableHead>
-                    <TableHead className="w-[100px] text-center">
+                    <TableHead className="w-25">Intention</TableHead>
+                    <TableHead className="w-30">Concurrence</TableHead>
+                    <TableHead className="w-25 text-center">
                       Pertinence
                     </TableHead>
                   </TableRow>
@@ -254,6 +347,13 @@ export function GeneratePageQueriesDialog({
                 <TableBody>
                   {queries.map((q, idx) => (
                     <TableRow key={idx}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedQueries.has(q.query)}
+                          onCheckedChange={() => handleToggleQuery(q.query)}
+                          aria-label={`Sélectionner ${q.query}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">{q.query}</TableCell>
                       <TableCell>
                         <span
@@ -313,7 +413,30 @@ export function GeneratePageQueriesDialog({
               <Button variant="outline" onClick={handleReset}>
                 Nouvelle génération
               </Button>
-              <Button onClick={handleClose}>Fermer</Button>
+              <Button
+                onClick={handleAddToTracking}
+                disabled={selectedQueries.size === 0 || adding || addSuccess}
+              >
+                {adding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Ajout...
+                  </>
+                ) : addSuccess ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Ajoutées
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter au suivi ({selectedQueries.size})
+                  </>
+                )}
+              </Button>
+              <Button variant="ghost" onClick={handleClose}>
+                Fermer
+              </Button>
             </>
           )}
         </DialogFooter>
