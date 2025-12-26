@@ -21,7 +21,7 @@ export async function POST(
     }
 
     const { websiteId } = await params;
-    const { urls, intentType, competitionLevel } = await req.json();
+    const { urls, intentType, competitionLevel, location } = await req.json();
 
     if (!urls || !Array.isArray(urls) || urls.length === 0) {
       return NextResponse.json(
@@ -141,12 +141,17 @@ Mots-clés: ${keywordsData ? JSON.stringify(keywordsData).slice(0, 200) : "N/A"}
           "Génère un mix équilibré: 40% de requêtes longue traîne (low), 40% de requêtes moyennes (medium), 20% de requêtes génériques (high).";
     }
 
+    const locationInstruction = location
+      ? `\nLOCALISATION: ${location}\nIMPORTANT: Intègre cette localisation dans les requêtes UNIQUEMENT quand c'est pertinent (services locaux, commerces, professionnels). N'ajoute PAS la localisation pour des produits en ligne ou services dématérialisés.\n`
+      : "";
+
     const prompt = `Tu es un expert SEO. Analyse le contenu extrait des pages suivantes et génère une liste de requêtes de recherche pertinentes que les utilisateurs pourraient utiliser pour trouver ces pages.
 
 ${intentInstruction}
 
 ${competitionInstruction}
 
+${locationInstruction}
 Contenu des pages:
 ${context}
 

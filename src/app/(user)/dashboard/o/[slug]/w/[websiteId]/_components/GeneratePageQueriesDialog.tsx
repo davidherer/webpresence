@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -53,6 +54,7 @@ export function GeneratePageQueriesDialog({
   const [generating, setGenerating] = useState(false);
   const [intentType, setIntentType] = useState<string>("all");
   const [competitionLevel, setCompetitionLevel] = useState<string>("all");
+  const [location, setLocation] = useState<string>("");
   const [queries, setQueries] = useState<GeneratedQuery[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
@@ -74,6 +76,7 @@ export function GeneratePageQueriesDialog({
             urls: selectedUrls,
             intentType,
             competitionLevel,
+            location: location.trim() || undefined,
           }),
         }
       );
@@ -276,6 +279,21 @@ export function GeneratePageQueriesDialog({
               </Select>
               <p className="text-xs text-muted-foreground">
                 Ciblez des requêtes selon leur niveau de compétition
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="location">Localisation (optionnel)</Label>
+              <Input
+                id="location"
+                type="text"
+                placeholder="ex: Paris, Lyon, France..."
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                maxLength={100}
+              />
+              <p className="text-xs text-muted-foreground">
+                Ajoutez une localisation pour générer des requêtes géolocalisées si pertinent
               </p>
             </div>
 
