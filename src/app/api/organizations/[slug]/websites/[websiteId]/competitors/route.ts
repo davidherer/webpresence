@@ -42,6 +42,84 @@ async function checkWebsiteAccess(
   return { website, role: membership.role };
 }
 
+async function computeCompetitorScore(competitorId: string, websiteId: string) {
+  // Get our latest SERP positions
+  const ourResults = await prisma.serpResult.findMany({
+    where: {
+      searchQuery: { websiteId, isActive: true },
+      searchQueryId: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      query: true,
+      position: true,
+    },
+  });
+
+  const ourPositions = new Map<string, number | null>();
+  for (const result of ourResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!ourPositions.has(queryLower)) {
+      ourPositions.set(queryLower, result.position);
+    }
+  }
+
+  // Get competitor's latest SERP positions
+  const competitorResults = await prisma.serpResult.findMany({
+    where: { competitorId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      query: true,
+      position: true,
+    },
+  });
+
+  const theirPositions = new Map<string, number | null>();
+  for (const result of competitorResults) {
+    const queryLower = result.query.toLowerCase();
+    if (!theirPositions.has(queryLower)) {
+      theirPositions.set(queryLower, result.position);
+    }
+  }
+
+  // Compare positions
+  let better = 0;
+  let worse = 0;
+  let total = 0;
+
+  const allQueries = new Set([
+    ...ourPositions.keys(),
+    ...theirPositions.keys(),
+  ]);
+
+  for (const query of allQueries) {
+    const ourPos = ourPositions.get(query);
+    const theirPos = theirPositions.get(query);
+
+    const weArePresent = ourPos !== null && ourPos !== undefined && ourPos > 0;
+    const theyArePresent =
+      theirPos !== null && theirPos !== undefined && theirPos > 0;
+
+    if (weArePresent || theyArePresent) {
+      total++;
+
+      if (weArePresent && !theyArePresent) {
+        better++;
+      } else if (!weArePresent && theyArePresent) {
+        worse++;
+      } else if (weArePresent && theyArePresent) {
+        if (ourPos! < theirPos!) {
+          better++;
+        } else if (ourPos! > theirPos!) {
+          worse++;
+        }
+      }
+    }
+  }
+
+  return { better, worse, total, netScore: better - worse };
+}
+
 // GET /api/organizations/[slug]/websites/[websiteId]/competitors
 export const GET = withUserAuth(
   async (req: NextRequest, context: RouteContext) => {
@@ -58,32 +136,64 @@ export const GET = withUserAuth(
 
     const url = new URL(req.url);
     const includeInactive = url.searchParams.get("includeInactive") === "true";
+    const page = parseInt(url.searchParams.get("page") || "1");
+    const limit = parseInt(url.searchParams.get("limit") || "50");
+    const sortBy = url.searchParams.get("sortBy") || "score"; // 'score' or 'name'
+    const sortOrder = url.searchParams.get("sortOrder") || "desc"; // 'asc' or 'desc'
 
+    // Get all competitors
     const competitors = await prisma.competitor.findMany({
       where: {
         websiteId,
         ...(includeInactive ? {} : { isActive: true }),
       },
-      include: {
-        _count: {
-          select: { serpResults: true, pageAnalyses: true },
-        },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        description: true,
+        isActive: true,
+        createdAt: true,
       },
-      orderBy: { createdAt: "desc" },
     });
+
+    // Compute scores for all competitors
+    const competitorsWithScores = await Promise.all(
+      competitors.map(async (competitor) => {
+        const score = await computeCompetitorScore(competitor.id, websiteId);
+        return {
+          ...competitor,
+          score,
+        };
+      })
+    );
+
+    // Sort competitors
+    competitorsWithScores.sort((a, b) => {
+      if (sortBy === "score") {
+        const diff = b.score.netScore - a.score.netScore;
+        return sortOrder === "desc" ? diff : -diff;
+      } else {
+        // Sort by name
+        const comparison = a.name.localeCompare(b.name);
+        return sortOrder === "desc" ? -comparison : comparison;
+      }
+    });
+
+    // Paginate
+    const skip = (page - 1) * limit;
+    const paginatedCompetitors = competitorsWithScores.slice(
+      skip,
+      skip + limit
+    );
 
     return NextResponse.json({
       success: true,
-      data: competitors.map((c) => ({
-        id: c.id,
-        url: c.url,
-        name: c.name,
-        description: c.description,
-        isActive: c.isActive,
-        serpCount: c._count.serpResults,
-        pageAnalysisCount: c._count.pageAnalyses,
-        createdAt: c.createdAt,
-      })),
+      data: paginatedCompetitors,
+      totalCount: competitorsWithScores.length,
+      hasMore: skip + limit < competitorsWithScores.length,
+      page,
+      limit,
     });
   }
 );

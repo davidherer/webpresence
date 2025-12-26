@@ -221,7 +221,6 @@ export default function WebsitePage({ params }: PageProps) {
           </div>
           <div className="w-[400px] flex-shrink-0">
             <CompetitorsColumn 
-              competitors={website.competitors} 
               orgSlug={slug} 
               websiteId={websiteId} 
             />
