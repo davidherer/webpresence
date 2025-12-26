@@ -16,45 +16,23 @@ function validateCronRequest(req: NextRequest): boolean {
 
 // POST /api/cron/process-jobs - Process pending jobs in the queue
 export async function POST(req: NextRequest) {
-  console.log("[Cron Process-Jobs] ===== Starting job processing =====");
-  console.log("[Cron Process-Jobs] Environment:", process.env.NODE_ENV);
-  console.log(
-    "[Cron Process-Jobs] Auth header:",
-    req.headers.get("authorization") ? "present" : "missing"
-  );
-
   if (!validateCronRequest(req)) {
-    console.log(
-      "[Cron Process-Jobs] ❌ Unauthorized - invalid or missing credentials"
-    );
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  console.log("[Cron Process-Jobs] ✅ Authentication successful");
-
   try {
-    console.log("[Cron Process-Jobs] Calling jobQueue.processJobQueue()...");
     const result = await jobQueue.processJobQueue();
-
-    console.log("[Cron Process-Jobs] ✅ Job processing completed");
-    console.log("[Cron Process-Jobs] Result:", JSON.stringify(result, null, 2));
 
     return NextResponse.json({
       success: true,
       data: result,
     });
   } catch (error) {
-    console.error("[Cron Process-Jobs] ❌ Error processing jobs:", error);
-    console.error(
-      "[Cron Process-Jobs] Error stack:",
-      error instanceof Error ? error.stack : "N/A"
-    );
+    console.error("[Cron] Error processing jobs:", error);
     return NextResponse.json(
       { success: false, error: "Failed to process jobs" },
       { status: 500 }
     );
-  } finally {
-    console.log("[Cron Process-Jobs] ===== Job processing finished =====");
   }
 }
 

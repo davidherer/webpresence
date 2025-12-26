@@ -14,7 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Minus, Search, RefreshCw } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { TrendingUp, TrendingDown, Minus, Search, RefreshCw, MoreVertical, Trash2 } from "lucide-react";
 
 interface SerpResult {
   position: number | null;
@@ -57,6 +64,7 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
   const [filter, setFilter] = useState("");
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
 
   const filteredQueries = useMemo(() => {
     return queries.filter(q =>
@@ -115,6 +123,42 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
     }
   };
 
+  const cleanSelected = async () => {
+    if (selectedQueries.size === 0) return;
+    
+    if (!confirm(`Voulez-vous vraiment supprimer tous les classements SERP de ${selectedQueries.size} requête${selectedQueries.size > 1 ? 's' : ''} ?`)) {
+      return;
+    }
+    
+    setCleaning(true);
+    try {
+      const response = await fetch(`/api/organizations/${orgSlug}/websites/${websiteId}/clean-serp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          queryIds: Array.from(selectedQueries),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Échec du nettoyage");
+      }
+
+      // Réinitialiser la sélection
+      setSelectedQueries(new Set());
+      
+      // Rafraîchir la page
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to clean SERP:", error);
+      alert("Erreur lors du nettoyage des classements");
+    } finally {
+      setCleaning(false);
+    }
+  };
+
   return (
     <Card className="h-[calc(100vh-180px)]">
       <CardHeader className="pb-3">
@@ -142,16 +186,41 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
             <span className="text-xs text-muted-foreground">
               {selectedQueries.size} sélectionnée{selectedQueries.size > 1 ? 's' : ''}
             </span>
-            <Button
-              variant="default"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={analyzeSelected}
-              disabled={analyzing}
-            >
-              <RefreshCw className={`w-3 h-3 mr-1 ${analyzing ? 'animate-spin' : ''}`} />
-              {analyzing ? "Analyse..." : "Analyser"}
-            </Button>
+            <div className="flex gap-1">
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={analyzeSelected}
+                disabled={analyzing || cleaning}
+              >
+                <RefreshCw className={`w-3 h-3 mr-1 ${analyzing ? 'animate-spin' : ''}`} />
+                {analyzing ? "Analyse..." : "Analyser"}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    disabled={analyzing || cleaning}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={analyzeSelected} disabled={analyzing}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Analyser la sélection
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={cleanSelected} disabled={cleaning} className="text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Nettoyer les classements
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         )}
       </CardHeader>
