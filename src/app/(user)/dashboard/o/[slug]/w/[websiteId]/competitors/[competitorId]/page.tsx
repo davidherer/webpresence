@@ -158,9 +158,20 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
       id: competitorId,
       websiteId,
     },
+    include: {
+      serpResults: {
+        where: { url: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { url: true },
+      },
+    },
   });
 
   if (!competitor) notFound();
+
+  // Get the most recent competitor page URL from SERP results
+  const competitorPageUrl = competitor.serpResults[0]?.url || null;
 
   // Get SERP comparisons
   const comparisons = await getCompetitorSerpComparisons(competitorId, websiteId);
@@ -183,7 +194,7 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold mb-2">{competitor.name}</h1>
-        <div className="flex items-center gap-4 text-muted-foreground">
+        <div className="flex flex-col gap-2 text-muted-foreground">
           <a
             href={competitor.url}
             target="_blank"
@@ -194,6 +205,17 @@ export default async function CompetitorDetailPage({ params }: PageProps) {
             {competitor.url}
             <ExternalLink className="w-3 h-3" />
           </a>
+          {competitorPageUrl && (
+            <a
+              href={competitorPageUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-blue-500 hover:text-blue-600 text-sm ml-5"
+            >
+              Page : {competitorPageUrl}
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          )}
           <span className="flex items-center gap-1 text-sm">
             <Calendar className="w-4 h-4" />
             Suivi depuis le {new Date(competitor.createdAt).toLocaleDateString("fr-FR")}
