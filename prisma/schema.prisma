@@ -160,15 +160,40 @@ model Website {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  searchQueries SearchQuery[]
-  competitors   Competitor[]
-  pageAnalyses  PageAnalysis[]
-  aiReports     AIReport[]
-  analysisJobs  AnalysisJob[]
+  searchQueries    SearchQuery[]
+  competitors      Competitor[]
+  pageAnalyses     PageAnalysis[]
+  aiReports        AIReport[]
+  analysisJobs     AnalysisJob[]
+  sitemapSnapshots SitemapSnapshot[]
 
   @@unique([organizationId, url])
   @@index([organizationId])
   @@index([status])
+}
+
+// ==========================================
+// SITEMAP MANAGEMENT
+// ==========================================
+
+model SitemapSnapshot {
+  id          String   @id @default(cuid())
+  websiteId   String
+  sitemapUrl  String // The sitemap URL that was fetched
+  blobUrl     String // Vercel Blob storage URL for the full sitemap data
+  urlCount    Int      @default(0) // Number of URLs in this snapshot
+  fetchedAt   DateTime @default(now())
+  sitemapType String   @default("single") // single, index, subset
+  parentId    String? // For sitemap index, reference to parent snapshot
+  metadata    Json? // Additional metadata (changefreq distribution, etc.)
+
+  website Website          @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  parent  SitemapSnapshot? @relation("SitemapHierarchy", fields: [parentId], references: [id])
+  children SitemapSnapshot[] @relation("SitemapHierarchy")
+
+  @@index([websiteId, fetchedAt(sort: Desc)])
+  @@index([websiteId])
+  @@index([fetchedAt])
 }
 
 // ==========================================

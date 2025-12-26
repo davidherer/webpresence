@@ -42,10 +42,88 @@ async function processJob(
 
     case "sitemap_fetch":
       console.log(
-        `[JobQueue processJob] Sitemap fetch (handled as part of initial analysis)`
+        `[JobQueue processJob] Sitemap fetch for website ${websiteId}`
       );
-      // Handled as part of initial analysis for now
-      return { success: true };
+      // Import dynamically to avoid circular dependencies
+      const { brightdata } = await import("@/lib/brightdata");
+      const { storage } = await import("@/lib/storage");
+
+      // Get website data
+      const website = await prisma.website.findUnique({
+        where: { id: websiteId },
+      });
+
+      if (!website) {
+        return { success: false, error: "Website not found" };
+      }
+
+      const websiteUrl = payload.websiteUrl || website.url;
+      const selectedSitemaps = payload.selectedSitemaps || [];
+
+      try {
+        // Fetch the sitemap
+        const sitemapResult = await brightdata.fetchSitemap(websiteUrl);
+
+        // Si c'est un sitemap index et qu'on a des sitemaps sélectionnés
+        let allUrls = sitemapResult.urls;
+
+        if (selectedSitemaps.length > 0) {
+          // Fetch selected sub-sitemaps
+          const subSitemapUrls: any[] = [];
+          for (const subSitemapUrl of selectedSitemaps) {
+            try {
+              const subResult = await brightdata.fetchSitemap(subSitemapUrl);
+              subSitemapUrls.push(...subResult.urls);
+            } catch (err) {
+              console.error(
+                `Failed to fetch sub-sitemap ${subSitemapUrl}:`,
+                err
+              );
+            }
+          }
+          allUrls = subSitemapUrls;
+        }
+
+        // Store in Vercel Blob
+        const blobResult = await storage.storeSitemap(
+          websiteId,
+          sitemapResult.sitemapUrl,
+          {
+            urls: allUrls,
+            sitemapUrl: sitemapResult.sitemapUrl,
+            timestamp: sitemapResult.timestamp,
+          }
+        );
+
+        // Create snapshot in database
+        await prisma.sitemapSnapshot.create({
+          data: {
+            websiteId,
+            sitemapUrl: sitemapResult.sitemapUrl,
+            blobUrl: blobResult.url,
+            urlCount: allUrls.length,
+            fetchedAt: new Date(),
+            sitemapType: selectedSitemaps.length > 0 ? "subset" : "single",
+            metadata: {
+              selectedSitemaps,
+            },
+          },
+        });
+
+        // Update website record
+        await prisma.website.update({
+          where: { id: websiteId },
+          data: {
+            sitemapUrl: sitemapResult.sitemapUrl,
+            lastSitemapFetch: new Date(),
+          },
+        });
+
+        return { success: true, data: { urlCount: allUrls.length } };
+      } catch (err: any) {
+        console.error(`Sitemap fetch error:`, err);
+        return { success: false, error: err.message };
+      }
 
     case "page_scrape":
       console.log(

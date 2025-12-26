@@ -1,33 +1,23 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { use } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { AnalyzeButton } from "./_components/AnalyzeButton";
-import { CompetitorScore } from "./_components/CompetitorScore";
 import { OnboardingBanner } from "./_components/OnboardingBanner";
 import { GenerateQueriesDialog } from "./_components/GenerateQueriesDialog";
+import { QueriesColumn } from "./_components/QueriesColumn";
+import { CompetitorsColumn } from "./_components/CompetitorsColumn";
+import { ReportsColumn } from "./_components/ReportsColumn";
+import { SitemapColumn } from "./_components/SitemapColumn";
 import {
   ArrowLeft,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   ExternalLink,
   RefreshCw,
   AlertCircle,
   Sparkles,
-  Search,
 } from "lucide-react";
 
 interface PageProps {
@@ -78,33 +68,12 @@ interface WebsiteData {
   website: Website;
 }
 
-// Get trend for a search query (comparing last 2 SERP results)
-const getTrend = (serpResults: { position: number | null }[]) => {
-  if (serpResults.length < 2) return null;
-  const current = serpResults[0]?.position;
-  const previous = serpResults[1]?.position;
-  if (current === null || previous === null) return null;
-  return previous - current; // Positive = improvement (lower position is better)
-};
-
-const getTrendIcon = (trend: number | null) => {
-  if (trend === null) return <Minus className="w-4 h-4 text-muted-foreground" />;
-  if (trend > 0) return <TrendingUp className="w-4 h-4 text-green-500" />;
-  if (trend < 0) return <TrendingDown className="w-4 h-4 text-red-500" />;
-  return <Minus className="w-4 h-4 text-muted-foreground" />;
-};
-
 export default function WebsitePage({ params }: PageProps) {
   const { slug, websiteId } = use(params);
   const [data, setData] = useState<WebsiteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
-  
-  // Filtres
-  const [queryFilter, setQueryFilter] = useState("");
-  const [competitorFilter, setCompetitorFilter] = useState("");
-  const [reportFilter, setReportFilter] = useState("");
 
   // Reload data function
   const reloadData = async () => {
@@ -138,31 +107,6 @@ export default function WebsitePage({ params }: PageProps) {
     }
     loadData();
   }, [slug, websiteId]);
-
-  // Filtrage des données
-  const filteredQueries = useMemo(() => {
-    if (!data) return [];
-    return data.website.searchQueries.filter(q =>
-      q.query.toLowerCase().includes(queryFilter.toLowerCase()) ||
-      (q.description?.toLowerCase() || "").includes(queryFilter.toLowerCase())
-    );
-  }, [data, queryFilter]);
-
-  const filteredCompetitors = useMemo(() => {
-    if (!data) return [];
-    return data.website.competitors.filter(c =>
-      c.name.toLowerCase().includes(competitorFilter.toLowerCase()) ||
-      c.url.toLowerCase().includes(competitorFilter.toLowerCase())
-    );
-  }, [data, competitorFilter]);
-
-  const filteredReports = useMemo(() => {
-    if (!data) return [];
-    return data.website.aiReports.filter(r =>
-      r.title.toLowerCase().includes(reportFilter.toLowerCase()) ||
-      r.type.toLowerCase().includes(reportFilter.toLowerCase())
-    );
-  }, [data, reportFilter]);
 
   if (loading) {
     return (
@@ -263,242 +207,38 @@ export default function WebsitePage({ params }: PageProps) {
         }}
       />
 
-      {/* Layout 3 colonnes */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Colonne 1: Requêtes */}
-        <Card className="h-[calc(100vh-180px)]">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">
-                Requêtes ({filteredQueries.length})
-              </CardTitle>
-              <Link href={`/dashboard/o/${slug}/w/${websiteId}/queries`}>
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  Tout voir
-                </Button>
-              </Link>
-            </div>
-            <div className="relative mt-2">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filtrer..."
-                value={queryFilter}
-                onChange={(e) => setQueryFilter(e.target.value)}
-                className="pl-8 h-8 text-xs"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-auto h-[calc(100vh-280px)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[60%]">Requête</TableHead>
-                    <TableHead className="text-center">Position</TableHead>
-                    <TableHead className="text-center w-[60px]">Trend</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredQueries.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
-                        {queryFilter ? "Aucun résultat" : "Aucune requête"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredQueries.map((query) => {
-                      const latestPosition = query.serpResults[0]?.position;
-                      const trend = getTrend(query.serpResults);
-                      return (
-                        <TableRow
-                          key={query.id}
-                          className="cursor-pointer"
-                          onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/queries/${query.id}`}
-                        >
-                          <TableCell className="py-2">
-                            <div className="text-xs font-medium truncate">{query.query}</div>
-                            {query.description && (
-                              <div className="text-xs text-muted-foreground truncate">
-                                {query.description}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center py-2">
-                            <span className="text-xs font-semibold">
-                              {latestPosition !== null && latestPosition !== undefined && latestPosition > 0
-                                ? `#${latestPosition}`
-                                : query.serpResults.length > 0
-                                  ? <span className="text-orange-500">-</span>
-                                  : "-"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center py-2">
-                            {getTrendIcon(trend)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Colonne 2: Concurrents */}
-        <Card className="h-[calc(100vh-180px)]">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">
-                Concurrents ({filteredCompetitors.length})
-              </CardTitle>
-              <Link href={`/dashboard/o/${slug}/w/${websiteId}/competitors`}>
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  Tout voir
-                </Button>
-              </Link>
-            </div>
-            <div className="relative mt-2">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filtrer..."
-                value={competitorFilter}
-                onChange={(e) => setCompetitorFilter(e.target.value)}
-                className="pl-8 h-8 text-xs"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-auto h-[calc(100vh-280px)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>URL</TableHead>
-                    <TableHead className="text-center w-[80px]">Score</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCompetitors.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
-                        {competitorFilter ? "Aucun résultat" : "Aucun concurrent"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredCompetitors.map((competitor) => (
-                      <TableRow
-                        key={competitor.id}
-                        className="cursor-pointer"
-                        onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/competitors/${competitor.id}`}
-                      >
-                        <TableCell className="py-2">
-                          <div className="text-xs font-medium">{competitor.name}</div>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <a
-                            href={competitor.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 truncate"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {competitor.url.replace(/^https?:\/\/(www\.)?/, '')}
-                            <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </TableCell>
-                        <TableCell className="py-2 text-center" onClick={(e) => e.stopPropagation()}>
-                          <CompetitorScore
-                            orgSlug={slug}
-                            websiteId={websiteId}
-                            competitorId={competitor.id}
-                            competitorUrl={competitor.url}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Colonne 3: Rapports */}
-        <Card className="h-[calc(100vh-180px)]">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-semibold">
-                Rapports ({filteredReports.length})
-              </CardTitle>
-              <Link href={`/dashboard/o/${slug}/w/${websiteId}/reports`}>
-                <Button variant="ghost" size="sm" className="h-7 text-xs">
-                  Tout voir
-                </Button>
-              </Link>
-            </div>
-            <div className="relative mt-2">
-              <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Filtrer..."
-                value={reportFilter}
-                onChange={(e) => setReportFilter(e.target.value)}
-                className="pl-8 h-8 text-xs"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-auto h-[calc(100vh-280px)]">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Titre</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredReports.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
-                        {reportFilter ? "Aucun résultat" : "Aucun rapport"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredReports.map((report) => (
-                      <TableRow
-                        key={report.id}
-                        className="cursor-pointer"
-                        onClick={() => window.location.href = `/dashboard/o/${slug}/w/${websiteId}/reports/${report.id}`}
-                      >
-                        <TableCell className="py-2">
-                          <span className="text-xs">
-                            {report.type === "initial_analysis"
-                              ? "Initial"
-                              : report.type === "periodic_recap"
-                              ? "Périodique"
-                              : "Concurrent"}
-                          </span>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <div className="text-xs font-medium truncate">{report.title}</div>
-                        </TableCell>
-                        <TableCell className="py-2">
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {new Date(report.createdAt).toLocaleDateString("fr-FR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            })}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Layout 4 colonnes avec scroll horizontal */}
+      <div className="overflow-x-auto">
+        <div className="flex gap-4 min-w-max">
+          <div className="w-[400px] flex-shrink-0">
+            <SitemapColumn 
+              orgSlug={slug} 
+              websiteId={websiteId}
+              websiteUrl={website.url}
+            />
+          </div>
+          <div className="w-[400px] flex-shrink-0">
+            <QueriesColumn 
+              queries={website.searchQueries} 
+              orgSlug={slug} 
+              websiteId={websiteId} 
+            />
+          </div>
+          <div className="w-[400px] flex-shrink-0">
+            <CompetitorsColumn 
+              competitors={website.competitors} 
+              orgSlug={slug} 
+              websiteId={websiteId} 
+            />
+          </div>
+          <div className="w-[400px] flex-shrink-0">
+            <ReportsColumn 
+              reports={website.aiReports} 
+              orgSlug={slug} 
+              websiteId={websiteId} 
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

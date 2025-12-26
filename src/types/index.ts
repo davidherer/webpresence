@@ -13,6 +13,7 @@ export type {
   AIReport,
   AISuggestion,
   AnalysisJob,
+  SitemapSnapshot,
 } from "@/generated/prisma/client";
 
 export interface ApiResponse<T = unknown> {
@@ -72,6 +73,41 @@ export interface SitemapEntry {
   lastmod?: string;
   changefreq?: string;
   priority?: number;
+}
+
+export interface SitemapIndexEntry {
+  loc: string;
+  lastmod?: string;
+}
+
+export interface ParsedSitemap {
+  type: "urlset" | "sitemapindex";
+  urls: SitemapEntry[];
+  sitemapIndexes?: SitemapIndexEntry[];
+  metadata?: {
+    totalUrls: number;
+    changefreqDistribution?: Record<string, number>;
+    priorityAverage?: number;
+  };
+}
+
+export interface SitemapUrl {
+  url: string;
+  lastmod?: string;
+  changefreq?: string;
+  priority?: number;
+  isAnalyzed?: boolean;
+  lastAnalyzed?: string;
+}
+
+export interface SitemapSnapshotWithUrls {
+  id: string;
+  websiteId: string;
+  sitemapUrl: string;
+  urlCount: number;
+  fetchedAt: string;
+  sitemapType: string;
+  urls: SitemapUrl[];
 }
 
 // ==========================================
