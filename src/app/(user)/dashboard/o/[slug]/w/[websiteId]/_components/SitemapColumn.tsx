@@ -134,6 +134,31 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
     }
   };
 
+  // Extraire toutes les URLs du sitemap (sans les charger)
+  const handleExtractAll = async () => {
+    setAddingToExtractions(true);
+    try {
+      const response = await fetch(
+        `/api/websites/${websiteId}/extractions/batch-sitemap`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "quick",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        setSelectedUrls(new Set());
+      }
+    } catch (err) {
+      console.error("Failed to extract all sitemap:", err);
+    } finally {
+      setAddingToExtractions(false);
+    }
+  };
+
   // Lancer l'analyse du sitemap
   const handleAnalyze = () => {
     setShowSelectionDialog(true);
@@ -223,14 +248,30 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
               </Button>
             )}
             {totalCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setShowDiffViewer(true)}
-              >
-                <History className="w-3 h-3" />
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleExtractAll}
+                  disabled={addingToExtractions}
+                >
+                  {addingToExtractions ? (
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  ) : (
+                    <Plus className="w-3 h-3 mr-1" />
+                  )}
+                  Tout extraire
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setShowDiffViewer(true)}
+                >
+                  <History className="w-3 h-3" />
+                </Button>
+              </>
             )}
             <Button
               variant="outline"

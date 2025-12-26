@@ -87,6 +87,22 @@ export async function deleteBlob(blobUrl: string): Promise<void> {
 }
 
 /**
+ * Get sitemap data from blob URL
+ */
+export async function getSitemapData(blobUrl: string): Promise<any> {
+  try {
+    const response = await fetch(blobUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch blob: ${response.statusText}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`[Blob] Failed to get sitemap data from ${blobUrl}:`, error);
+    throw error;
+  }
+}
+
+/**
  * Create a simple hash from a URL for file naming
  */
 function hashUrl(url: string): string {
@@ -104,4 +120,5 @@ export const storage = {
   storeSerpData,
   storeSitemap,
   deleteBlob,
+  getSitemapData,
 };
