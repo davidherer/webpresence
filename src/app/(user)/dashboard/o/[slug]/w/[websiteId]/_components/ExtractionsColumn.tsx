@@ -20,6 +20,7 @@ import {
   XCircle,
   Zap,
   Layers,
+  RefreshCw,
 } from "lucide-react";
 import {
   Select,
@@ -259,6 +260,42 @@ export function ExtractionsColumn({
     );
   };
 
+  // Formater la date de manière relative
+  const formatRelativeDate = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+
+    if (diffMinutes < 1) return "maintenant";
+    if (diffMinutes < 60) return `${diffMinutes}min`;
+    if (diffHours < 24) return `${diffHours}h`;
+    if (diffDays === 1) return "hier";
+    if (diffDays < 7) return `${diffDays}j`;
+    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  };
+
+  // Vérifier si une extraction est ancienne (>7 jours)
+  const isOldExtraction = (extractedAt: string | null) => {
+    if (!extractedAt) return false;
+    const diffMs = Date.now() - new Date(extractedAt).getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    return diffDays > 7;
+  };
+
+  // Filtrer les extractions anciennes
+  const oldExtractions = extractions.filter(
+    (e) => e.status === "completed" && isOldExtraction(e.extractedAt)
+  );
+
+  // Relancer les extractions anciennes
+  const handleRefreshOld = async () => {
+    const urls = oldExtractions.map((e) => e.url);
+    if (urls.length === 0) return;
+    await handleExtract(urls, "quick");
+  };
+
   return (
     <Card className="h-[calc(100vh-180px)]">
       <CardHeader className="pb-3">
@@ -268,36 +305,52 @@ export function ExtractionsColumn({
           </CardTitle>
           <div className="flex gap-1">
             {selectedUrls.size > 0 && (
-              <>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleExtractSelected("quick")}
-                  disabled={extracting}
-                  className="text-xs"
-                >
-                  {extracting ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <Zap className="w-3 h-3 mr-1" />
-                  )}
-                  Rapide ({selectedUrls.size})
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleExtractSelected("full")}
-                  disabled={extracting}
-                  className="text-xs"
-                >
-                  {extracting ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                  ) : (
-                    <Layers className="w-3 h-3 mr-1" />
-                  )}
-                  Complet ({selectedUrls.size})
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleExtractSelected("quick")}
+                disabled={extracting}
+                className="text-xs"
+              >
+                {extracting ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Zap className="w-3 h-3 mr-1" />
+                )}
+                Rapide ({selectedUrls.size})
+              </Button>
+            )}
+            {selectedUrls.size > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleExtractSelected("full")}
+                disabled={extracting}
+                className="text-xs"
+              >
+                {extracting ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <Layers className="w-3 h-3 mr-1" />
+                )}
+                Complet ({selectedUrls.size})
+              </Button>
+            )}
+            {oldExtractions.length > 0 && selectedUrls.size === 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRefreshOld}
+                disabled={extracting}
+                className="text-xs"
+              >
+                {extracting ? (
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3 h-3 mr-1" />
+                )}
+                Anciennes ({oldExtractions.length})
+              </Button>
             )}
           </div>
         </div>
@@ -360,6 +413,7 @@ export function ExtractionsColumn({
                 <TableHead className="w-20">Type</TableHead>
                 <TableHead>URL</TableHead>
                 <TableHead className="w-32">Titre</TableHead>
+                <TableHead className="w-24">Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -388,18 +442,27 @@ export function ExtractionsColumn({
                       <span className="text-gray-400 italic">-</span>
                     )}
                   </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {extraction.extractedAt ? (
+                      <span title={new Date(extraction.extractedAt).toLocaleString("fr-FR")}>
+                        {formatRelativeDate(new Date(extraction.extractedAt))}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 italic">-</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4">
+                  <TableCell colSpan={6} className="text-center py-4">
                     <Loader2 className="w-4 h-4 mx-auto animate-spin" />
                   </TableCell>
                 </TableRow>
               )}
               {!loading && filteredExtractions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Aucune extraction trouvée
                   </TableCell>
                 </TableRow>
