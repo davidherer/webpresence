@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getUserSession } from "@/lib/auth/user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Search, TrendingUp, TrendingDown, Minus, Zap, Mountain, Tag } from "lucide-react";
+import { ArrowLeft, Search, TrendingUp, TrendingDown, Minus, Zap, Mountain, Tag, FileText } from "lucide-react";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string }>;
@@ -41,6 +41,11 @@ export default async function QueriesPage({ params }: PageProps) {
           serpResults: {
             orderBy: { createdAt: "desc" },
             take: 1,
+          },
+          _count: {
+            select: {
+              competitorPageExtractions: true,
+            },
           },
         },
       },
@@ -148,8 +153,16 @@ export default async function QueriesPage({ params }: PageProps) {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between pt-4 border-t">
-                      <div className="text-sm text-muted-foreground">
-                        Confiance: {Math.round(searchQuery.confidence * 100)}%
+                      <div className="flex items-center gap-4">
+                        <div className="text-sm text-muted-foreground">
+                          Confiance: {Math.round(searchQuery.confidence * 100)}%
+                        </div>
+                        {searchQuery._count.competitorPageExtractions > 0 && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <FileText className="w-4 h-4" />
+                            {searchQuery._count.competitorPageExtractions} extraction{searchQuery._count.competitorPageExtractions > 1 ? "s" : ""}
+                          </div>
+                        )}
                       </div>
                       <Button variant="outline" size="sm" asChild>
                         <Link href={`/dashboard/o/${slug}/w/${websiteId}/queries/${searchQuery.id}`}>

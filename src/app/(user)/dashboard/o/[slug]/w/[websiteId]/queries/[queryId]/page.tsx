@@ -10,6 +10,7 @@ import { SuggestionsList } from "./_components/SuggestionsList";
 import { MetaComparisonBlock } from "./_components/MetaComparisonBlock";
 import { AISuggestionsBlock } from "./_components/AISuggestionsBlock";
 import { TagsEditor } from "./_components/TagsEditor";
+import { CompetitorExtractionsBlock } from "./_components/CompetitorExtractionsBlock";
 
 interface PageProps {
   params: Promise<{ slug: string; websiteId: string; queryId: string }>;
@@ -142,6 +143,13 @@ export default async function QueryDetailPage({ params }: PageProps) {
 
           {/* Competitors - Client Component */}
           <CompetitorsList
+            orgSlug={slug}
+            websiteId={websiteId}
+            queryId={queryId}
+          />
+
+          {/* Competitor Extractions - Client Component */}
+          <CompetitorExtractionsBlock
             orgSlug={slug}
             websiteId={websiteId}
             queryId={queryId}

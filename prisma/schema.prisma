@@ -239,6 +239,7 @@ model SearchQuery {
 
   serpResults   SerpResult[]
   aiSuggestions AISuggestion[]
+  competitorPageExtractions CompetitorPageExtraction[]
 
   @@index([websiteId])
   @@index([isActive])
@@ -267,6 +268,7 @@ model Competitor {
 
   serpResults         SerpResult[]
   pageAnalyses        CompetitorPageAnalysis[]
+  pageExtractions     CompetitorPageExtraction[]
   sitemapSnapshots    CompetitorSitemapSnapshot[]
 
   @@unique([websiteId, url])
@@ -426,6 +428,48 @@ model CompetitorPageAnalysis {
   @@index([competitorId])
   @@index([url])
   @@index([createdAt])
+}
+
+// ==========================================
+// COMPETITOR PAGE EXTRACTION (For SERP results)
+// ==========================================
+
+model CompetitorPageExtraction {
+  id            String   @id @default(cuid())
+  searchQueryId String   // Reference to the search query
+  competitorId  String?  // Optional reference to competitor (if it's a known competitor)
+  url           String
+  position      Int?     // Position in SERP
+  source        String   @default("serp") // serp, manual
+  type          String?  // quick, full, null if not yet extracted
+  status        String   @default("pending") // pending, extracting, completed, failed
+  
+  // Quick extraction fields
+  title           String?
+  metaDescription String?
+  h1              String[]         @default([])
+  
+  // Full extraction fields (JSON for complex data)
+  headings Json? // { h2: [], h3: [], h4: [], h5: [], h6: [] }
+  keywords Json? // [{ keyword: string, frequency: number, density: number, score: number }]
+  
+  // HTML storage
+  htmlBlobUrl String?
+  
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  extractedAt DateTime? // When extraction was completed
+  error       String?
+  
+  searchQuery SearchQuery @relation(fields: [searchQueryId], references: [id], onDelete: Cascade)
+  competitor  Competitor? @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  @@index([searchQueryId])
+  @@index([competitorId])
+  @@index([url])
+  @@index([status])
+  @@index([type])
+  @@index([extractedAt])
 }
 
 // ==========================================

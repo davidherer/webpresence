@@ -12,6 +12,7 @@ import { CompetitorsColumn } from "./_components/CompetitorsColumn";
 import { ReportsColumn } from "./_components/ReportsColumn";
 import { SitemapColumn } from "./_components/SitemapColumn";
 import { ExtractionsColumn } from "./_components/ExtractionsColumn";
+import { CompetitorExtractionsColumn } from "./_components/CompetitorExtractionsColumn";
 import {
   ArrowLeft,
   ExternalLink,
@@ -217,6 +218,12 @@ export default function WebsitePage({ params }: PageProps) {
               queries={website.searchQueries} 
               orgSlug={slug} 
               websiteId={websiteId} 
+            />
+          </div>
+          <div className="w-[400px] flex-shrink-0">
+            <CompetitorExtractionsColumn 
+              websiteId={websiteId}
+              orgSlug={slug}
             />
           </div>
           <div className="w-[400px] flex-shrink-0">

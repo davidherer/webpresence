@@ -126,3 +126,55 @@ export async function extractPage(
     throw error;
   }
 }
+
+/**
+ * Extraire le contenu d'une page (utilisé pour les pages concurrentes)
+ */
+export async function extractPageContent(
+  url: string,
+  fullExtraction: boolean = false
+): Promise<{
+  title: string | null;
+  metaDescription: string | null;
+  h1: string[];
+  headings?: {
+    h2: string[];
+    h3: string[];
+    h4: string[];
+    h5: string[];
+    h6: string[];
+  };
+  keywords?: Array<{ keyword: string; frequency: number; density: number }>;
+  htmlBlobUrl: string;
+}> {
+  console.log(`[Extraction] Extracting content from ${url}`);
+
+  try {
+    // 1. Scraper la page
+    const scrapeResult = await brightdata.scrapePage({
+      url,
+      timeout: 30000,
+    });
+
+    // 2. Stocker le HTML
+    const blobResult = await storeHtml("competitor", url, scrapeResult.html);
+
+    // 3. Extraire les données
+    if (fullExtraction) {
+      const fullResult = await extractFull(scrapeResult.html);
+      return {
+        ...fullResult,
+        htmlBlobUrl: blobResult.url,
+      };
+    } else {
+      const quickResult = await extractQuick(scrapeResult.html);
+      return {
+        ...quickResult,
+        htmlBlobUrl: blobResult.url,
+      };
+    }
+  } catch (error) {
+    console.error(`[Extraction] Error extracting content from ${url}:`, error);
+    throw error;
+  }
+}

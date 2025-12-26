@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TrendingUp, TrendingDown, Minus, Search, RefreshCw, MoreVertical, Trash2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Search, RefreshCw, MoreVertical, Trash2, FileText } from "lucide-react";
 
 interface SerpResult {
   position: number | null;
@@ -65,6 +65,7 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
   const [selectedQueries, setSelectedQueries] = useState<Set<string>>(new Set());
   const [analyzing, setAnalyzing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   const filteredQueries = useMemo(() => {
     return queries.filter(q =>
@@ -156,6 +157,46 @@ export function QueriesColumn({ queries, orgSlug, websiteId }: QueriesColumnProp
       alert("Erreur lors du nettoyage des classements");
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const extractSerpPages = async () => {
+    if (selectedQueries.size === 0) return;
+    
+    if (!confirm(`Voulez-vous créer des extractions pour les pages SERP de ${selectedQueries.size} requête${selectedQueries.size > 1 ? 's' : ''} ?`)) {
+      return;
+    }
+    
+    setExtracting(true);
+    try {
+      const response = await fetch(`/api/organizations/${orgSlug}/websites/${websiteId}/extract-serp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          queryIds: Array.from(selectedQueries),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Échec de la création des extractions");
+      }
+
+      const data = await response.json();
+      
+      // Réinitialiser la sélection
+      setSelectedQueries(new Set());
+      
+      alert(`${data.count || 0} extraction${(data.count || 0) > 1 ? 's' : ''} créée${(data.count || 0) > 1 ? 's' : ''}`);
+      
+      // Rafraîchir la page
+      window.location.reload();
+    } catch (error) {
+      console.error("Failed to create extractions:", error);
+      alert("Erreur lors de la création des extractions");
+    } finally {
+      setExtracting(false);
     }
   };
 
