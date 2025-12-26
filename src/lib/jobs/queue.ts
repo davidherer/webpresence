@@ -108,6 +108,90 @@ async function processJob(
         return { success: false, error: err.message };
       }
 
+    case "competitor_sitemap_fetch":
+      // Import dynamically to avoid circular dependencies
+      const { brightdata: brightdataComp } = await import("@/lib/brightdata");
+      const { storage: storageComp } = await import("@/lib/storage");
+
+      if (!payload.competitorId) {
+        return { success: false, error: "Missing competitorId" };
+      }
+
+      // Get competitor data
+      const competitor = await prisma.competitor.findUnique({
+        where: { id: payload.competitorId },
+      });
+
+      if (!competitor) {
+        return { success: false, error: "Competitor not found" };
+      }
+
+      const competitorUrl = competitor.url;
+      const selectedCompSitemaps = payload.selectedSitemaps || [];
+
+      try {
+        // Fetch the sitemap
+        const sitemapResult = await brightdataComp.fetchSitemap(competitorUrl);
+
+        // Si c'est un sitemap index et qu'on a des sitemaps sélectionnés
+        let allCompUrls = sitemapResult.urls;
+
+        if (selectedCompSitemaps.length > 0) {
+          // Fetch selected sub-sitemaps
+          const subSitemapUrls: any[] = [];
+          for (const subSitemapUrl of selectedCompSitemaps) {
+            try {
+              const subResult = await brightdataComp.fetchSitemap(
+                subSitemapUrl
+              );
+              subSitemapUrls.push(...subResult.urls);
+            } catch (err) {
+              // Silently continue on sub-sitemap errors
+            }
+          }
+          allCompUrls = subSitemapUrls;
+        }
+
+        // Store in Vercel Blob
+        const blobResult = await storageComp.storeCompetitorSitemap(
+          payload.competitorId,
+          sitemapResult.sitemapUrl,
+          {
+            urls: allCompUrls,
+            sitemapUrl: sitemapResult.sitemapUrl,
+            timestamp: sitemapResult.timestamp,
+          }
+        );
+
+        // Create snapshot in database
+        await prisma.competitorSitemapSnapshot.create({
+          data: {
+            competitorId: payload.competitorId,
+            sitemapUrl: sitemapResult.sitemapUrl,
+            blobUrl: blobResult.url,
+            urlCount: allCompUrls.length,
+            fetchedAt: new Date(),
+            sitemapType: selectedCompSitemaps.length > 0 ? "subset" : "single",
+            metadata: {
+              selectedSitemaps: selectedCompSitemaps,
+            },
+          },
+        });
+
+        // Update competitor record
+        await prisma.competitor.update({
+          where: { id: payload.competitorId },
+          data: {
+            sitemapUrl: sitemapResult.sitemapUrl,
+            lastSitemapFetch: new Date(),
+          },
+        });
+
+        return { success: true, data: { urlCount: allCompUrls.length } };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+
     case "page_scrape":
       if (payload.urls && payload.urls.length > 0) {
         // TODO: Implement page scraping

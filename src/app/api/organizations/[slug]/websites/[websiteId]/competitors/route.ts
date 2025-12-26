@@ -154,6 +154,14 @@ export const GET = withUserAuth(
         description: true,
         isActive: true,
         createdAt: true,
+        sitemapSnapshots: {
+          orderBy: { fetchedAt: "desc" },
+          take: 1,
+          select: {
+            urlCount: true,
+            fetchedAt: true,
+          },
+        },
       },
     });
 
@@ -161,9 +169,17 @@ export const GET = withUserAuth(
     const competitorsWithScores = await Promise.all(
       competitors.map(async (competitor) => {
         const score = await computeCompetitorScore(competitor.id, websiteId);
+        const latestSitemap = competitor.sitemapSnapshots[0];
         return {
-          ...competitor,
+          id: competitor.id,
+          name: competitor.name,
+          url: competitor.url,
+          description: competitor.description,
+          isActive: competitor.isActive,
+          createdAt: competitor.createdAt,
           score,
+          sitemapUrlCount: latestSitemap?.urlCount,
+          lastSitemapFetch: latestSitemap?.fetchedAt?.toISOString(),
         };
       })
     );

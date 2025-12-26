@@ -242,14 +242,43 @@ model Competitor {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Cached sitemap data
+  sitemapUrl       String?
+  lastSitemapFetch DateTime?
+
   website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
-  serpResults   SerpResult[]
-  pageAnalyses  CompetitorPageAnalysis[]
+  serpResults         SerpResult[]
+  pageAnalyses        CompetitorPageAnalysis[]
+  sitemapSnapshots    CompetitorSitemapSnapshot[]
 
   @@unique([websiteId, url])
   @@index([websiteId])
   @@index([isActive])
+}
+
+// ==========================================
+// COMPETITOR SITEMAP MANAGEMENT
+// ==========================================
+
+model CompetitorSitemapSnapshot {
+  id          String   @id @default(cuid())
+  competitorId String
+  sitemapUrl  String // The sitemap URL that was fetched
+  blobUrl     String // Vercel Blob storage URL for the full sitemap data
+  urlCount    Int      @default(0) // Number of URLs in this snapshot
+  fetchedAt   DateTime @default(now())
+  sitemapType String   @default("single") // single, index, subset
+  parentId    String? // For sitemap index, reference to parent snapshot
+  metadata    Json? // Additional metadata (changefreq distribution, etc.)
+
+  competitor Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  parent     CompetitorSitemapSnapshot? @relation("CompetitorSitemapHierarchy", fields: [parentId], references: [id])
+  children   CompetitorSitemapSnapshot[] @relation("CompetitorSitemapHierarchy")
+
+  @@index([competitorId, fetchedAt(sort: Desc)])
+  @@index([competitorId])
+  @@index([fetchedAt])
 }
 
 // ==========================================

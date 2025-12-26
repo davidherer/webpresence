@@ -33,6 +33,8 @@ interface Competitor {
   name: string;
   url: string;
   score: CompetitorScore;
+  sitemapUrlCount?: number;
+  lastSitemapFetch?: string;
 }
 
 interface CompetitorsColumnProps {
@@ -50,7 +52,7 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortBy, setSortBy] = useState<"score" | "name">("score");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -124,7 +126,8 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
       setSortOrder(prev => prev === "desc" ? "asc" : "desc");
     } else {
       setSortBy(newSortBy);
-      setSortOrder("desc");
+      // Par défaut : asc pour score (négatifs en premier), desc pour nom (A-Z)
+      setSortOrder(newSortBy === "score" ? "asc" : "desc");
     }
   };
 
@@ -198,13 +201,14 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
             <TableHeader>
               <TableRow>
                 <TableHead>Nom</TableHead>
-                <TableHead className="text-center w-20">Score</TableHead>
+                <TableHead className="text-center w-16">Score</TableHead>
+                <TableHead className="text-center w-20">Sitemap</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCompetitors.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center text-xs text-muted-foreground py-8">
+                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
                     {filter ? "Aucun résultat" : "Aucun concurrent"}
                   </TableCell>
                 </TableRow>
@@ -221,12 +225,21 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
                     <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
                       {renderScore(competitor.score)}
                     </TableCell>
+                    <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      {competitor.sitemapUrlCount !== undefined ? (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {competitor.sitemapUrlCount}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={2} className="text-center py-4">
+                  <TableCell colSpan={3} className="text-center py-4">
                     <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>

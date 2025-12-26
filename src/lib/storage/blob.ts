@@ -76,6 +76,28 @@ export async function storeSitemap(
 }
 
 /**
+ * Store competitor sitemap data in Vercel Blob
+ */
+export async function storeCompetitorSitemap(
+  competitorId: string,
+  sitemapUrl: string,
+  data: object
+): Promise<BlobUploadResult> {
+  const timestamp = Date.now();
+  const pathname = `${BLOB_PREFIX}/competitor-sitemap/${competitorId}/${timestamp}.json`;
+
+  const blob = await put(pathname, JSON.stringify(data), {
+    access: "public",
+    contentType: "application/json",
+  });
+
+  return {
+    url: blob.url,
+    pathname,
+  };
+}
+
+/**
  * Delete a blob by URL
  */
 export async function deleteBlob(blobUrl: string): Promise<void> {
@@ -119,6 +141,7 @@ export const storage = {
   storeHtml,
   storeSerpData,
   storeSitemap,
+  storeCompetitorSitemap,
   deleteBlob,
   getSitemapData,
 };

@@ -143,6 +143,7 @@ export type AISuggestionStatus = "pending" | "accepted" | "dismissed";
 
 export type AnalysisJobType =
   | "sitemap_fetch"
+  | "competitor_sitemap_fetch"
   | "page_scrape"
   | "page_extraction"
   | "serp_analysis"
