@@ -12,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search, Loader2, RefreshCw, CheckCircle2, Circle, Globe, History } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, Loader2, RefreshCw, CheckCircle2, Circle, Globe, History, Plus } from "lucide-react";
 import { SitemapSelectionDialog } from "./SitemapSelectionDialog";
 import { SitemapDiffViewer } from "./SitemapDiffViewer";
 
@@ -44,6 +45,8 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [lastFetch, setLastFetch] = useState<string | null>(null);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+  const [addingToExtractions, setAddingToExtractions] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,6 +80,59 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
       setLoading(false);
     }
   }, [orgSlug, websiteId, loading]);
+
+  // Toggle sélection d'une URL
+  const toggleUrlSelection = (url: string) => {
+    setSelectedUrls(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(url)) {
+        newSet.delete(url);
+      } else {
+        newSet.add(url);
+      }
+      return newSet;
+    });
+  };
+
+  // Sélectionner/désélectionner toutes les URLs filtrées
+  const toggleSelectAll = () => {
+    if (selectedUrls.size === filteredUrls.length) {
+      setSelectedUrls(new Set());
+    } else {
+      setSelectedUrls(new Set(filteredUrls.map(u => u.url)));
+    }
+  };
+
+  // Ajouter les URLs sélectionnées aux extractions
+  const handleAddToExtractions = async () => {
+    if (selectedUrls.size === 0) return;
+
+    setAddingToExtractions(true);
+    try {
+      const response = await fetch(
+        `/api/websites/${websiteId}/extractions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            urls: Array.from(selectedUrls),
+            type: "quick", // Par défaut extraction rapide
+            source: "sitemap",
+          }),
+        }
+      );
+
+      if (response.ok) {
+        // Désélectionner tout après ajout
+        setSelectedUrls(new Set());
+        // Optionnel : afficher un message de succès
+      }
+    } catch (err) {
+      console.error("Failed to add URLs to extractions:", err);
+    } finally {
+      setAddingToExtractions(false);
+    }
+  };
 
   // Lancer l'analyse du sitemap
   const handleAnalyze = () => {
@@ -145,6 +201,27 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
             Sitemap ({totalCount})
           </CardTitle>
           <div className="flex gap-1">
+            {selectedUrls.size > 0 && (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={handleAddToExtractions}
+                disabled={addingToExtractions}
+              >
+                {addingToExtractions ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    Ajout...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-3 h-3 mr-1" />
+                    Extraire ({selectedUrls.size})
+                  </>
+                )}
+              </Button>
+            )}
             {totalCount > 0 && (
               <Button
                 variant="ghost"
@@ -196,6 +273,12 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[40px]">
+                  <Checkbox
+                    checked={selectedUrls.size > 0 && selectedUrls.size === filteredUrls.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
                 <TableHead className="w-[50px]">Statut</TableHead>
                 <TableHead>URL</TableHead>
                 <TableHead className="text-center w-[100px]">Priorité</TableHead>
@@ -204,7 +287,7 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
             <TableBody>
               {filteredUrls.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-8">
+                  <TableCell colSpan={4} className="text-center py-8">
                     <Globe className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">
                       {urls.length === 0 
@@ -220,8 +303,14 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
                   return (
                     <TableRow
                       key={`${urlData.url}-${index}`}
-                      className="cursor-pointer hover:bg-muted/50"
+                      className="hover:bg-muted/50"
                     >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedUrls.has(urlData.url)}
+                          onCheckedChange={() => toggleUrlSelection(urlData.url)}
+                        />
+                      </TableCell>
                       <TableCell>
                         {urlData.isAnalyzed ? (
                           <CheckCircle2 className="w-4 h-4 text-green-500" />

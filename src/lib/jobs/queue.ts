@@ -214,7 +214,10 @@ async function processJob(
         });
 
         console.log(
-          `      ✓ PageExtraction mise à jour: ${payload.extractionId.substring(0, 8)}...`
+          `      ✓ PageExtraction mise à jour: ${payload.extractionId.substring(
+            0,
+            8
+          )}...`
         );
 
         return {
