@@ -256,6 +256,8 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
         onClose={() => setShowSelectionDialog(false)}
         onConfirm={handleConfirmAnalyze}
         websiteUrl={websiteUrl}
+        orgSlug={orgSlug}
+        websiteId={websiteId}
       />
 
       <SitemapDiffViewer

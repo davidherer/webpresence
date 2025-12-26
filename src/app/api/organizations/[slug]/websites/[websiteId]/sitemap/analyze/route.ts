@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth/user";
 import { prisma } from "@/lib/db";
-import { addJob } from "@/lib/jobs/queue";
 
 export async function POST(
   request: NextRequest,
@@ -45,14 +44,16 @@ export async function POST(
     const selectedSitemaps = body.selectedSitemaps || [];
 
     // Créer un job pour analyser le sitemap
-    const job = await addJob({
-      websiteId,
-      type: "sitemap_fetch",
-      payload: {
-        selectedSitemaps,
-        websiteUrl: website.url,
+    const job = await prisma.analysisJob.create({
+      data: {
+        websiteId,
+        type: "sitemap_fetch",
+        payload: {
+          selectedSitemaps,
+          websiteUrl: website.url,
+        },
+        priority: 5,
       },
-      priority: 5,
     });
 
     return NextResponse.json({

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "db:seed": "npx tsx prisma/seed.ts",
-    "db:reset": "npx prisma migrate reset --force && pnpm db:seed"
+    "db:reset": "npx prisma migrate reset --force && pnpm db:seed",
+    "jobs:process": "curl -X POST http://localhost:3000/api/cron/process-jobs",
+    "jobs:dev": "npx tsx scripts/process-jobs.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
