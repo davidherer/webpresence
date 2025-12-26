@@ -45,21 +45,22 @@ export const POST = withUserAuth(
     // Récupérer le domaine du site web client pour l'exclure
     const website = await prisma.website.findUnique({
       where: { id: websiteId },
-      select: { domain: true },
+      select: { url: true },
     });
 
-    if (!website?.domain) {
-      return NextResponse.json(
-        { error: "Domaine du site web non trouvé" },
-        { status: 404 }
-      );
+    let clientDomain: string | null = null;
+    
+    if (website?.url) {
+      try {
+        clientDomain = new URL(
+          website.url.startsWith("http")
+            ? website.url
+            : `https://${website.url}`
+        ).hostname;
+      } catch (error) {
+        console.error("Invalid website URL:", website.url);
+      }
     }
-
-    const clientDomain = new URL(
-      website.domain.startsWith("http")
-        ? website.domain
-        : `https://${website.domain}`
-    ).hostname;
 
     try {
       const body = await req.json();
@@ -106,9 +107,10 @@ export const POST = withUserAuth(
         );
       }
 
-      // Filtrer pour ne garder que les URLs concurrentes (exclure le domaine client)
+      // Filtrer pour ne garder que les URLs concurrentes (exclure le domaine client si défini)
       const competitorResults = serpResults.filter((result) => {
         if (!result.url) return false;
+        if (!clientDomain) return true; // Si pas de domaine client, garder tout
         try {
           const resultDomain = new URL(result.url).hostname;
           return resultDomain !== clientDomain;
@@ -119,7 +121,9 @@ export const POST = withUserAuth(
 
       if (competitorResults.length === 0) {
         return NextResponse.json(
-          { error: "Aucune page concurrente trouvée dans les résultats SERP" },
+          { error: clientDomain 
+            ? "Aucune page concurrente trouvée dans les résultats SERP" 
+            : "Aucun résultat SERP avec URL valide trouvé" },
           { status: 404 }
         );
       }

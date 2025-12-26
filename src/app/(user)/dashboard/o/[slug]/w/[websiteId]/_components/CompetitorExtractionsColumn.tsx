@@ -163,7 +163,6 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
     });
   }, [extractions, searchFilter]);
 
-  const completedExtractions = filteredExtractions.filter(e => e.status === "completed");
   const inProgressCount = extractions.filter(e => e.status === "pending" || e.status === "extracting").length;
 
   const toggleExtraction = (extractionId: string) => {
@@ -178,14 +177,14 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedExtractions(new Set(completedExtractions.map(e => e.id)));
+      setSelectedExtractions(new Set(filteredExtractions.map(e => e.id)));
     } else {
       setSelectedExtractions(new Set());
     }
   };
 
-  const allSelected = completedExtractions.length > 0 && selectedExtractions.size === completedExtractions.length;
-  const someSelected = selectedExtractions.size > 0 && selectedExtractions.size < completedExtractions.length;
+  const allSelected = filteredExtractions.length > 0 && selectedExtractions.size === filteredExtractions.length;
+  const someSelected = selectedExtractions.size > 0 && selectedExtractions.size < filteredExtractions.length;
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -361,12 +360,10 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
                   return (
                     <TableRow key={extraction.id} className="text-xs">
                       <TableCell>
-                        {extraction.status === "completed" && (
-                          <Checkbox
-                            checked={selectedExtractions.has(extraction.id)}
-                            onCheckedChange={() => toggleExtraction(extraction.id)}
-                          />
-                        )}
+                        <Checkbox
+                          checked={selectedExtractions.has(extraction.id)}
+                          onCheckedChange={() => toggleExtraction(extraction.id)}
+                        />
                       </TableCell>
                       <TableCell className="py-2">
                         <div className="max-w-[280px]">
