@@ -142,10 +142,10 @@ export async function runSerpAnalysis(
         competitors,
       });
 
-      // Auto-add top competitors (if not already tracked)
-      const topCompetitors = competitors.slice(0, 3);
+      // Auto-add all competitors found in SERP (up to 10)
+      const topCompetitors = competitors.slice(0, 10);
       console.log(
-        `[SERP runSerpAnalysis] Checking top ${topCompetitors.length} competitors...`
+        `[SERP runSerpAnalysis] Checking ${topCompetitors.length} competitors...`
       );
 
       for (const comp of topCompetitors) {
