@@ -158,7 +158,7 @@ export async function runSerpAnalysis(
             `[SERP runSerpAnalysis] Adding new competitor: ${comp.domain}`
           );
           // Create competitor (will need manual validation)
-          await prisma.competitor.create({
+          const newCompetitor = await prisma.competitor.create({
             data: {
               websiteId,
               url: `https://${comp.domain}`,
@@ -167,9 +167,41 @@ export async function runSerpAnalysis(
             },
           });
           console.log(`[SERP runSerpAnalysis] ✅ Competitor added`);
+
+          // Create SerpResult for this competitor
+          await prisma.serpResult.create({
+            data: {
+              competitorId: newCompetitor.id,
+              query,
+              position: comp.position,
+              url: comp.url,
+              searchEngine: "google",
+              country: "FR",
+              device: "desktop",
+              rawDataBlobUrl: blobResult.url,
+            },
+          });
+          console.log(`[SERP runSerpAnalysis] ✅ Competitor SERP result saved`);
         } else {
           console.log(
             `[SERP runSerpAnalysis] Competitor ${comp.domain} already exists`
+          );
+
+          // Update or create SerpResult for existing competitor
+          await prisma.serpResult.create({
+            data: {
+              competitorId: existing.id,
+              query,
+              position: comp.position,
+              url: comp.url,
+              searchEngine: "google",
+              country: "FR",
+              device: "desktop",
+              rawDataBlobUrl: blobResult.url,
+            },
+          });
+          console.log(
+            `[SERP runSerpAnalysis] ✅ Competitor SERP result updated`
           );
         }
       }
