@@ -80,7 +80,7 @@ async function processJob(
         );
 
         // Create snapshot in database
-        await prisma.sitemapSnapshot.create({
+        const snapshot = await prisma.sitemapSnapshot.create({
           data: {
             websiteId,
             sitemapUrl: sitemapResult.sitemapUrl,
@@ -93,6 +93,23 @@ async function processJob(
             },
           },
         });
+
+        // Store individual URLs in database for fast querying
+        if (allUrls.length > 0) {
+          await prisma.sitemapUrl.createMany({
+            data: allUrls.map((urlData: any) => ({
+              snapshotId: snapshot.id,
+              url: urlData.loc || urlData.url,
+              lastmod: urlData.lastmod || null,
+              changefreq: urlData.changefreq || null,
+              priority:
+                urlData.priority !== undefined
+                  ? parseFloat(String(urlData.priority))
+                  : null,
+            })),
+            skipDuplicates: true,
+          });
+        }
 
         // Update website record
         await prisma.website.update({
@@ -164,7 +181,7 @@ async function processJob(
         );
 
         // Create snapshot in database
-        await prisma.competitorSitemapSnapshot.create({
+        const compSnapshot = await prisma.competitorSitemapSnapshot.create({
           data: {
             competitorId: payload.competitorId,
             sitemapUrl: sitemapResult.sitemapUrl,
@@ -177,6 +194,23 @@ async function processJob(
             },
           },
         });
+
+        // Store individual URLs in database for fast querying
+        if (allCompUrls.length > 0) {
+          await prisma.competitorSitemapUrl.createMany({
+            data: allCompUrls.map((urlData: any) => ({
+              snapshotId: compSnapshot.id,
+              url: urlData.loc || urlData.url,
+              lastmod: urlData.lastmod || null,
+              changefreq: urlData.changefreq || null,
+              priority:
+                urlData.priority !== undefined
+                  ? parseFloat(String(urlData.priority))
+                  : null,
+            })),
+            skipDuplicates: true,
+          });
+        }
 
         // Update competitor record
         await prisma.competitor.update({

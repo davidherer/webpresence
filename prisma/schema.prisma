@@ -191,10 +191,27 @@ model SitemapSnapshot {
   website Website          @relation(fields: [websiteId], references: [id], onDelete: Cascade)
   parent  SitemapSnapshot? @relation("SitemapHierarchy", fields: [parentId], references: [id])
   children SitemapSnapshot[] @relation("SitemapHierarchy")
+  urls     SitemapUrl[]
 
   @@index([websiteId, fetchedAt(sort: Desc)])
   @@index([websiteId])
   @@index([fetchedAt])
+}
+
+// Individual URLs from sitemap snapshots
+model SitemapUrl {
+  id         String   @id @default(cuid())
+  snapshotId String
+  url        String
+  lastmod    String?
+  changefreq String?
+  priority   Float?
+  createdAt  DateTime @default(now())
+
+  snapshot SitemapSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([url])
 }
 
 // ==========================================
@@ -275,10 +292,27 @@ model CompetitorSitemapSnapshot {
   competitor Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
   parent     CompetitorSitemapSnapshot? @relation("CompetitorSitemapHierarchy", fields: [parentId], references: [id])
   children   CompetitorSitemapSnapshot[] @relation("CompetitorSitemapHierarchy")
+  urls       CompetitorSitemapUrl[]
 
   @@index([competitorId, fetchedAt(sort: Desc)])
   @@index([competitorId])
   @@index([fetchedAt])
+}
+
+// Individual URLs from competitor sitemap snapshots
+model CompetitorSitemapUrl {
+  id         String   @id @default(cuid())
+  snapshotId String
+  url        String
+  lastmod    String?
+  changefreq String?
+  priority   Float?
+  createdAt  DateTime @default(now())
+
+  snapshot CompetitorSitemapSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+
+  @@index([snapshotId])
+  @@index([url])
 }
 
 // ==========================================

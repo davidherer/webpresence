@@ -19,7 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, ArrowUpDown, Loader2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Search, ArrowUpDown, Loader2, TrendingUp, TrendingDown, Minus, Globe } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface CompetitorScore {
   better: number;
@@ -53,6 +54,8 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
   const [totalCount, setTotalCount] = useState(0);
   const [sortBy, setSortBy] = useState<"score" | "name">("score");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -62,6 +65,56 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
       c.name.toLowerCase().includes(filter.toLowerCase())
     );
   }, [competitors, filter]);
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(filteredCompetitors.map((c) => c.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectCompetitor = (competitorId: string, checked: boolean) => {
+    const newSelection = new Set(selectedIds);
+    if (checked) {
+      newSelection.add(competitorId);
+    } else {
+      newSelection.delete(competitorId);
+    }
+    setSelectedIds(newSelection);
+  };
+
+  const handleAnalyzeSitemaps = async () => {
+    if (selectedIds.size === 0) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch(
+        `/api/organizations/${orgSlug}/websites/${websiteId}/competitors/batch-analyze-sitemap`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ competitorIds: Array.from(selectedIds) }),
+        }
+      );
+
+      if (response.ok) {
+        alert(`Analyse de sitemap lancée pour ${selectedIds.size} concurrent(s)`);
+        setSelectedIds(new Set());
+      } else {
+        const data = await response.json();
+        alert(`Erreur : ${data.error || "Échec de l'analyse"}`);
+      }
+    } catch (error) {
+      console.error("Failed to start batch sitemap analysis:", error);
+      alert("Erreur lors du lancement des analyses");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const allSelected = filteredCompetitors.length > 0 && selectedIds.size === filteredCompetitors.length;
+  const someSelected = selectedIds.size > 0 && selectedIds.size < filteredCompetitors.length;
 
   // Charger les concurrents
   const loadCompetitors = useCallback(async (pageNum: number, reset: boolean = false) => {
@@ -162,6 +215,27 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
             Concurrents ({totalCount})
           </CardTitle>
           <div className="flex gap-2">
+            {selectedIds.size > 0 && (
+              <Button
+                onClick={handleAnalyzeSitemaps}
+                disabled={isAnalyzing}
+                size="sm"
+                variant="default"
+                className="h-7 text-xs"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    Analyse...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="w-3 h-3 mr-1" />
+                    Analyser ({selectedIds.size})
+                  </>
+                )}
+              </Button>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="h-7 text-xs">
@@ -200,6 +274,13 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={handleSelectAll}
+                    className={someSelected ? "data-[state=checked]:bg-gray-400" : ""}
+                  />
+                </TableHead>
                 <TableHead>Nom</TableHead>
                 <TableHead className="text-center w-16">Score</TableHead>
                 <TableHead className="text-center w-20">Sitemap</TableHead>
@@ -208,38 +289,49 @@ export function CompetitorsColumn({ orgSlug, websiteId }: CompetitorsColumnProps
             <TableBody>
               {filteredCompetitors.length === 0 && !loading ? (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center text-xs text-muted-foreground py-8">
+                  <TableCell colSpan={4} className="text-center text-xs text-muted-foreground py-8">
                     {filter ? "Aucun résultat" : "Aucun concurrent"}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredCompetitors.map((competitor) => (
-                  <TableRow
-                    key={competitor.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => window.location.href = `/dashboard/o/${orgSlug}/w/${websiteId}/competitors/${competitor.id}`}
-                  >
-                    <TableCell className="py-1.5">
-                      <div className="text-xs font-medium">{competitor.name}</div>
-                    </TableCell>
-                    <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                      {renderScore(competitor.score)}
-                    </TableCell>
-                    <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
-                      {competitor.sitemapUrlCount !== undefined ? (
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {competitor.sitemapUrlCount}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredCompetitors.map((competitor) => {
+                  const isSelected = selectedIds.has(competitor.id);
+                  return (
+                    <TableRow
+                      key={competitor.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${isSelected ? "bg-primary/5" : ""}`}
+                      onClick={() => window.location.href = `/dashboard/o/${orgSlug}/w/${websiteId}/competitors/${competitor.id}`}
+                    >
+                      <TableCell className="py-1.5" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) =>
+                            handleSelectCompetitor(competitor.id, checked as boolean)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="py-1.5">
+                        <div className="text-xs font-medium">{competitor.name}</div>
+                      </TableCell>
+                      <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        {renderScore(competitor.score)}
+                      </TableCell>
+                      <TableCell className="py-1.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        {competitor.sitemapUrlCount !== undefined ? (
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {competitor.sitemapUrlCount}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
               {loading && (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center py-4">
+                  <TableCell colSpan={4} className="text-center py-4">
                     <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>

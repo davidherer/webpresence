@@ -85,21 +85,32 @@ export async function GET(
       );
     }
 
-    // Fetch the sitemap data from blob storage
-    const response = await fetch(latestSnapshot.blobUrl);
-    if (!response.ok) {
-      throw new Error("Failed to fetch sitemap from blob storage");
-    }
-
-    const sitemapData = await response.json();
-    const allUrls = sitemapData.urls || [];
-
     // Pagination
     const page = parseInt(request.nextUrl.searchParams.get("page") || "1");
     const limit = parseInt(request.nextUrl.searchParams.get("limit") || "50");
     const offset = (page - 1) * limit;
 
-    const paginatedUrls = allUrls.slice(offset, offset + limit);
+    // Récupérer les URLs depuis la table CompetitorSitemapUrl (données en base)
+    const totalCount = await prisma.competitorSitemapUrl.count({
+      where: { snapshotId: latestSnapshot.id },
+    });
+
+    const sitemapUrls = await prisma.competitorSitemapUrl.findMany({
+      where: { snapshotId: latestSnapshot.id },
+      select: {
+        url: true,
+        lastmod: true,
+        changefreq: true,
+        priority: true,
+      },
+      orderBy: { url: "asc" },
+      skip: offset,
+      take: limit,
+    });
+
+    const hasMore = offset + limit < totalCount;
+
+    const hasMore = offset + limit < totalCount;
 
     return NextResponse.json<ApiResponse>({
       success: true,
@@ -111,12 +122,12 @@ export async function GET(
           fetchedAt: latestSnapshot.fetchedAt.toISOString(),
           sitemapType: latestSnapshot.sitemapType,
         },
-        urls: paginatedUrls,
+        urls: sitemapUrls,
         pagination: {
           page,
           limit,
-          total: allUrls.length,
-          hasMore: offset + limit < allUrls.length,
+          total: totalCount,
+          hasMore,
         },
       },
     });

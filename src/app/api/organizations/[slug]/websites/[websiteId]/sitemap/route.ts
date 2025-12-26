@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserSession } from "@/lib/auth/user";
 import { prisma } from "@/lib/db";
-import { list } from "@vercel/blob";
 
 export async function GET(
   request: NextRequest,
@@ -40,7 +39,13 @@ export async function GET(
       return NextResponse.json({ error: "Website not found" }, { status: 404 });
     }
 
-    // Récupérer le dernier snapshot
+    // Pagination
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const offset = (page - 1) * limit;
+
+    // Récupérer le dernier snapshot pour les métadonnées
     const latestSnapshot = await prisma.sitemapSnapshot.findFirst({
       where: { websiteId },
       orderBy: { fetchedAt: "desc" },
@@ -55,56 +60,70 @@ export async function GET(
       });
     }
 
-    // Pagination
-    const searchParams = request.nextUrl.searchParams;
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "50");
-    const offset = (page - 1) * limit;
+    // Récupérer les URLs depuis la table SitemapUrl (données en base)
+    const totalCount = await prisma.sitemapUrl.count({
+      where: { snapshotId: latestSnapshot.id },
+    });
 
-    // Récupérer les données du sitemap depuis Blob
-    const response = await fetch(latestSnapshot.blobUrl);
-    if (!response.ok) {
-      throw new Error("Failed to fetch sitemap from blob storage");
-    }
+    const sitemapUrls = await prisma.sitemapUrl.findMany({
+      where: { snapshotId: latestSnapshot.id },
+      select: {
+        url: true,
+        lastmod: true,
+        changefreq: true,
+        priority: true,
+      },
+      orderBy: { url: "asc" },
+      skip: offset,
+      take: limit,
+    });
 
-    const sitemapData = await response.json();
-    const allUrls = sitemapData.urls || [];
-
-    // Récupérer les URLs déjà analysées
-    const analyzedUrls = await prisma.pageAnalysis.findMany({
+    // Récupérer les URLs déjà analysées pour les enrichir
+    const urlList = sitemapUrls.map((u) => u.url);
+    const analyzedUrls = await prisma.pageExtraction.findMany({
       where: {
         websiteId,
-        url: { in: allUrls.map((u: any) => u.loc || u.url) },
+        url: { in: urlList },
       },
       select: {
         url: true,
-        createdAt: true,
+        status: true,
+        type: true,
+        extractedAt: true,
       },
     });
 
-    const analyzedMap = new Map(analyzedUrls.map((a) => [a.url, a.createdAt]));
+    const analyzedMap = new Map(
+      analyzedUrls.map((a) => [
+        a.url,
+        {
+          status: a.status,
+          type: a.type,
+          extractedAt: a.extractedAt,
+        },
+      ])
+    );
 
-    // Enrichir les URLs avec le statut d'analyse
-    const enrichedUrls = allUrls.map((urlData: any) => {
-      const url = urlData.loc || urlData.url;
-      const lastAnalyzed = analyzedMap.get(url);
+    // Formater les URLs
+    const enrichedUrls = sitemapUrls.map((sitemapUrl) => {
+      const analyzed = analyzedMap.get(sitemapUrl.url);
       return {
-        url,
-        lastmod: urlData.lastmod,
-        changefreq: urlData.changefreq,
-        priority: urlData.priority,
-        isAnalyzed: !!lastAnalyzed,
-        lastAnalyzed: lastAnalyzed?.toISOString(),
+        url: sitemapUrl.url,
+        lastmod: sitemapUrl.lastmod,
+        changefreq: sitemapUrl.changefreq,
+        priority: sitemapUrl.priority,
+        isAnalyzed: analyzed?.status === "completed" && analyzed?.type !== null,
+        lastAnalyzed: analyzed?.extractedAt?.toISOString(),
+        status: analyzed?.status,
+        type: analyzed?.type,
       };
     });
 
-    // Paginer
-    const paginatedUrls = enrichedUrls.slice(offset, offset + limit);
-    const hasMore = offset + limit < enrichedUrls.length;
+    const hasMore = offset + limit < totalCount;
 
     return NextResponse.json({
-      urls: paginatedUrls,
-      totalCount: enrichedUrls.length,
+      urls: enrichedUrls,
+      totalCount,
       hasMore,
       lastFetch: latestSnapshot.fetchedAt.toISOString(),
     });

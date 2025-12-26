@@ -53,7 +53,7 @@ export function CompetitorSitemapColumn({
 
   // Filtrer les URLs
   const filteredUrls = urls.filter((u) =>
-    u.url.toLowerCase().includes(filter.toLowerCase())
+    u?.url?.toLowerCase().includes(filter.toLowerCase())
   );
 
   // Charger les URLs du sitemap
@@ -69,8 +69,11 @@ export function CompetitorSitemapColumn({
 
         if (response.ok) {
           const data = await response.json();
+          console.log('[CompetitorSitemap] API Response:', data);
           if (data.success) {
-            setUrls((prev) => (reset ? data.data.urls : [...prev, ...data.data.urls]));
+            const newUrls = data.data.urls || [];
+            console.log('[CompetitorSitemap] URLs received:', newUrls.length);
+            setUrls((prev) => (reset ? newUrls : [...prev, ...newUrls]));
             setTotalCount(data.data.pagination.total);
             setHasMore(data.data.pagination.hasMore);
             setFetchedAt(data.data.snapshot.fetchedAt);
@@ -78,9 +81,13 @@ export function CompetitorSitemapColumn({
           }
         } else if (response.status === 404) {
           // Pas encore de sitemap
+          console.log('[CompetitorSitemap] No sitemap found (404)');
           setUrls([]);
           setTotalCount(0);
           setHasMore(false);
+        } else {
+          const errorData = await response.json();
+          console.error('[CompetitorSitemap] API Error:', response.status, errorData);
         }
       } catch (err) {
         console.error("Failed to load competitor sitemap:", err);
@@ -88,7 +95,7 @@ export function CompetitorSitemapColumn({
         setLoading(false);
       }
     },
-    [orgSlug, websiteId, competitorId, loading]
+    [orgSlug, websiteId, competitorId]
   );
 
   // Analyser le sitemap du concurrent
