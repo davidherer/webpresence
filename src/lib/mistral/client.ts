@@ -51,15 +51,21 @@ ${pagesContext}
 INSTRUCTIONS:
 1. Identifie les produits, services, thèmes, lieux ou entités que des utilisateurs seraient susceptibles de rechercher
 2. Pour chaque élément identifié, génère UNE requête de recherche (query) qui sera utilisée pour le suivi SERP
-3. Pour chaque requête, détermine:
+3. RESPECTE STRICTEMENT cette répartition:
+   - 20% (environ 1-2 requêtes sur 10) génériques HIGH: 1-3 mots courts (ex: "plombier", "restaurant")
+   - 80% (environ 8-9 requêtes sur 10) longue traîne LOW: 4 mots ou plus, très spécifiques (ex: "plombier urgence paris 15ème dimanche")
+   
+4. Pour chaque requête, détermine:
    - Une description de l'intention de recherche et de l'audience visée
-   - La requête exacte (1 à 5 mots-clés) pour le SERP
+   - La requête exacte (respecte le nombre de mots selon le niveau: HIGH=1-3 mots, LOW=4+ mots)
    - Des tags pour grouper les requêtes (type de produit, service, localisation, catégorie, etc.)
-   - Le niveau de concurrence: "HIGH" (requête générique, forte concurrence) ou "LOW" (longue traîne, faible concurrence)
+   - Le niveau de concurrence: "HIGH" (1-3 mots, générique) ou "LOW" (4+ mots, longue traîne)
    - Un score de confiance (0-1) basé sur la pertinence de la requête pour ce site
 
-4. Fournis un résumé général du positionnement du site
-5. Donne 3-5 recommandations initiales pour améliorer la visibilité
+5. Fournis un résumé général du positionnement du site
+6. Donne 3-5 recommandations initiales pour améliorer la visibilité
+
+IMPORTANT: Privilégie massivement les requêtes LOW (80%) car elles sont plus faciles à ranker.
 
 RÉPONDS UNIQUEMENT EN JSON avec cette structure exacte:
 {

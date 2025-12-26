@@ -254,35 +254,39 @@ export function SitemapColumn({ orgSlug, websiteId, websiteUrl }: SitemapColumnP
                 )}
               </Button>
             )}
-            {totalCount > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    disabled={addingToExtractions || analyzing}
-                  >
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleExtractAll}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Tout extraire
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleAnalyze}>
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    Analyser sitemap
-                  </DropdownMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={addingToExtractions || analyzing}
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {totalCount > 0 && (
+                  <>
+                    <DropdownMenuItem onClick={handleExtractAll}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Tout extraire
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={handleAnalyze}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Analyser sitemap
+                </DropdownMenuItem>
+                {totalCount > 0 && (
                   <DropdownMenuItem onClick={() => setShowDiffViewer(true)}>
                     <History className="w-4 h-4 mr-2" />
                     Historique
                   </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         {lastFetch && (

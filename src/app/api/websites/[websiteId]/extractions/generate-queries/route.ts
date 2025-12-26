@@ -126,24 +126,25 @@ Mots-clés: ${keywordsData ? JSON.stringify(keywordsData).slice(0, 200) : "N/A"}
     switch (competitionLevel) {
       case "low":
         competitionInstruction =
-          "Privilégiez les requêtes de longue traîne (4+ mots) et les niches spécifiques avec faible concurrence.";
+          "IMPORTANT: Génère UNIQUEMENT des requêtes de longue traîne (4 mots ou plus) avec faible concurrence. 100% des requêtes doivent être spécifiques et cibler des niches. Exemples: 'acheter planche surf débutant pas cher', 'meilleur restaurant végétarien paris 11ème'. Le niveau de concurrence doit être 'low' pour TOUTES les requêtes.";
         break;
       case "medium":
         competitionInstruction =
-          "Équilibrez entre requêtes spécifiques et génériques pour un niveau de concurrence moyen.";
+          "IMPORTANT: Génère un mix équilibré: 70% de requêtes moyennes (3-4 mots) avec concurrence modérée, et 30% de requêtes longue traîne. Exemples moyens: 'cours yoga en ligne', 'livraison pizza rapide'. Évite les requêtes trop génériques.";
         break;
       case "high":
         competitionInstruction =
-          "Incluez des requêtes génériques et à fort volume avec haute concurrence.";
+          "IMPORTANT: Génère des requêtes génériques et à fort volume: 70% de requêtes courtes (1-3 mots) avec haute concurrence, 30% de requêtes moyennes. Exemples: 'plombier', 'assurance auto', 'restaurant paris'. Ces requêtes ciblent un large public.";
         break;
       default:
         competitionInstruction =
-          "Incluez des requêtes de tous niveaux de concurrence.";
+          "Génère un mix équilibré: 40% de requêtes longue traîne (low), 40% de requêtes moyennes (medium), 20% de requêtes génériques (high).";
     }
 
     const prompt = `Tu es un expert SEO. Analyse le contenu extrait des pages suivantes et génère une liste de requêtes de recherche pertinentes que les utilisateurs pourraient utiliser pour trouver ces pages.
 
 ${intentInstruction}
+
 ${competitionInstruction}
 
 Contenu des pages:
@@ -151,10 +152,15 @@ ${context}
 
 Génère une liste de 10 à 20 requêtes de recherche pertinentes en français.
 Pour chaque requête, fournis:
-- La requête elle-même
+- La requête elle-même (RESPECTE STRICTEMENT le nombre de mots selon le niveau de concurrence)
 - Le type d'intention (informational, commercial, navigational, transactional)
-- Le niveau de concurrence estimé (low, medium, high)
+- Le niveau de concurrence estimé (low, medium, high) - DOIT correspondre à la longueur de la requête
 - Un score de pertinence (1-10)
+
+RÈGLES STRICTES pour le niveau de concurrence:
+- low = 4 mots ou plus (longue traîne, niches)
+- medium = 3-4 mots (concurrence modérée)
+- high = 1-3 mots (générique, forte concurrence)
 
 Réponds UNIQUEMENT avec un tableau JSON valide au format suivant:
 [

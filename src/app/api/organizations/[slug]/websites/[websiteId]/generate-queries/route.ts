@@ -91,24 +91,28 @@ ${targetAudience ? `AUDIENCE CIBLE: ${targetAudience}` : ""}
 ${location ? `LOCALISATION: ${location}` : ""}
 
 INSTRUCTIONS:
-1. Génère 8 à 15 requêtes de recherche pertinentes que des clients potentiels utiliseraient
-2. Inclus un mix de:
-   - Requêtes génériques à forte concurrence (2-3 mots)
-   - Requêtes de longue traîne moins compétitives (4-6 mots)
-   - Requêtes incluant la localisation si pertinent
-   - Requêtes basées sur l'intention (acheter, trouver, meilleur, etc.)
+1. Génère 12 à 15 requêtes de recherche pertinentes que des clients potentiels utiliseraient
+2. RESPECTE STRICTEMENT cette répartition:
+   - 20% (2-3 requêtes) génériques à forte concurrence HIGH: 1-3 mots courts et généraux
+   - 80% (10-12 requêtes) de longue traîne à faible concurrence LOW: 4 mots ou plus, très spécifiques
+   
+   Exemples HIGH (20%): "plombier", "restaurant paris", "cours yoga"
+   Exemples LOW (80%): "plombier urgence paris 15ème dimanche", "restaurant végétarien bio livraison rapide", "cours yoga débutant femme enceinte en ligne"
 
 3. Pour chaque requête, fournis:
-   - La requête exacte (1-6 mots-clés, en français si le projet est francophone)
+   - La requête exacte (en français si le projet est francophone)
    - Une description de l'intention de recherche
    - Des tags pour catégoriser (type de produit, service, audience, etc.)
-   - Le niveau de concurrence: UNIQUEMENT "HIGH" ou "LOW" (pas d'autre valeur)
+   - Le niveau de concurrence: UNIQUEMENT "HIGH" (1-3 mots) ou "LOW" (4+ mots)
    - Un score de confiance (0.5-1.0)
 
 4. Donne un résumé de la stratégie SEO recommandée
 5. Liste 3-5 recommandations pour ce projet
 
-IMPORTANT: competitionLevel doit être EXACTEMENT "HIGH" ou "LOW", aucune autre valeur n'est acceptée.
+IMPORTANT: 
+- 80% des requêtes doivent être LOW (longue traîne 4+ mots)
+- 20% seulement doivent être HIGH (génériques 1-3 mots)
+- competitionLevel doit être EXACTEMENT "HIGH" ou "LOW", aucune autre valeur n'est acceptée.
 
 RÉPONDS UNIQUEMENT EN JSON:
 {
