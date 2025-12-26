@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FileText, ExternalLink, Download, Sparkles, Loader2, MoreVertical, CheckCircle2, Circle, XCircle, RefreshCw, Search } from "lucide-react";
+import { FileText, ExternalLink, Download, Sparkles, Loader2, MoreVertical, CheckCircle2, Circle, XCircle, RefreshCw, Search, Trash2 } from "lucide-react";
 
 interface SearchQuery {
   id: string;
@@ -71,6 +71,7 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
   const [typeFilter, setTypeFilter] = useState<string>("all");
   
   const [selectedExtractions, setSelectedExtractions] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -211,6 +212,43 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
     }
   };
 
+  const deleteSelected = async () => {
+    if (selectedExtractions.size === 0) return;
+    
+    if (!confirm(`Voulez-vous vraiment supprimer ${selectedExtractions.size} extraction${selectedExtractions.size > 1 ? 's' : ''} ?`)) {
+      return;
+    }
+    
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/organizations/${orgSlug}/websites/${websiteId}/competitor-extractions`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          extractionIds: Array.from(selectedExtractions),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Échec de la suppression");
+      }
+
+      // Réinitialiser la sélection
+      setSelectedExtractions(new Set());
+      
+      // Recharger les extractions
+      setPage(1);
+      loadExtractions(1, true);
+    } catch (error) {
+      console.error("Failed to delete extractions:", error);
+      alert("Erreur lors de la suppression des extractions");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <Card className="h-[calc(100vh-8rem)] flex flex-col">
       <CardHeader>
@@ -276,6 +314,16 @@ export function CompetitorExtractionsColumn({ websiteId, orgSlug }: CompetitorEx
             <Button variant="outline" size="sm" className="h-8">
               <Download className="w-3 h-3 mr-1" />
               Exporter
+            </Button>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="h-8"
+              onClick={deleteSelected}
+              disabled={deleting}
+            >
+              <Trash2 className="w-3 h-3 mr-1" />
+              {deleting ? "Suppression..." : "Supprimer"}
             </Button>
           </div>
         )}

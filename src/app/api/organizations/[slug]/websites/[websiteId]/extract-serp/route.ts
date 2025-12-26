@@ -42,6 +42,25 @@ export const POST = withUserAuth(
       );
     }
 
+    // Récupérer le domaine du site web client pour l'exclure
+    const website = await prisma.website.findUnique({
+      where: { id: websiteId },
+      select: { domain: true },
+    });
+
+    if (!website?.domain) {
+      return NextResponse.json(
+        { error: "Domaine du site web non trouvé" },
+        { status: 404 }
+      );
+    }
+
+    const clientDomain = new URL(
+      website.domain.startsWith("http")
+        ? website.domain
+        : `https://${website.domain}`
+    ).hostname;
+
     try {
       const body = await req.json();
       const { queryIds } = body;
@@ -87,8 +106,26 @@ export const POST = withUserAuth(
         );
       }
 
+      // Filtrer pour ne garder que les URLs concurrentes (exclure le domaine client)
+      const competitorResults = serpResults.filter((result) => {
+        if (!result.url) return false;
+        try {
+          const resultDomain = new URL(result.url).hostname;
+          return resultDomain !== clientDomain;
+        } catch {
+          return false;
+        }
+      });
+
+      if (competitorResults.length === 0) {
+        return NextResponse.json(
+          { error: "Aucune page concurrente trouvée dans les résultats SERP" },
+          { status: 404 }
+        );
+      }
+
       // Créer les extractions concurrentes
-      const extractionsToCreate = serpResults
+      const extractionsToCreate = competitorResults
         .filter((result) => result.url && result.position)
         .map((result) => {
           return {
