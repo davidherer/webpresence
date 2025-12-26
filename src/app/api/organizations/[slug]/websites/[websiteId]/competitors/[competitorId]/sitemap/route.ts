@@ -110,8 +110,6 @@ export async function GET(
 
     const hasMore = offset + limit < totalCount;
 
-    const hasMore = offset + limit < totalCount;
-
     return NextResponse.json<ApiResponse>({
       success: true,
       data: {

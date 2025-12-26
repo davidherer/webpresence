@@ -86,7 +86,7 @@ export async function POST(
         prisma.analysisJob.create({
           data: {
             type: "competitor_sitemap_fetch",
-            status: "PENDING",
+            status: "pending",
             priority: 2,
             payload: {
               competitorId: competitor.id,

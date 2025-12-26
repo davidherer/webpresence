@@ -448,7 +448,7 @@ class BrightDataClient {
       throw new Error(`No sitemap found for ${websiteUrl}`);
     }
 
-    const urls = this.parseSitemapXml(sitemapHtml);
+    const urls = await this.parseSitemapXmlRecursive(sitemapHtml, websiteUrl);
 
     return {
       urls,
@@ -458,22 +458,92 @@ class BrightDataClient {
   }
 
   /**
-   * Parse sitemap XML content
+   * Parse sitemap XML with recursive support for sitemap indexes
    */
-  private parseSitemapXml(xml: string): SitemapUrl[] {
-    const urls: SitemapUrl[] = [];
+  private async parseSitemapXmlRecursive(
+    xml: string,
+    baseUrl: string,
+    depth: number = 0,
+    maxDepth: number = 3
+  ): Promise<SitemapUrl[]> {
+    // Prevent infinite recursion
+    if (depth > maxDepth) {
+      console.warn(`[Sitemap] Max recursion depth reached (${maxDepth})`);
+      return [];
+    }
 
     // Handle sitemap index (contains references to other sitemaps)
     if (xml.includes("<sitemapindex")) {
-      // For now, just extract the sitemap URLs
-      // In production, we'd recursively fetch each sitemap
-      const sitemapPattern = /<loc>([^<]+)<\/loc>/g;
-      let match;
-      while ((match = sitemapPattern.exec(xml)) !== null) {
-        urls.push({ loc: match[1] });
+      console.log(
+        `[Sitemap] Detected sitemap index at depth ${depth}, fetching child sitemaps...`
+      );
+      const childSitemapUrls = this.extractSitemapLocations(xml);
+      console.log(
+        `[Sitemap] Found ${childSitemapUrls.length} child sitemaps to fetch`
+      );
+
+      const allUrls: SitemapUrl[] = [];
+
+      // Fetch each child sitemap
+      for (const childUrl of childSitemapUrls) {
+        try {
+          console.log(`[Sitemap] Fetching child sitemap: ${childUrl}`);
+          const result = await this.scrapePage({
+            url: childUrl,
+            timeout: 15000,
+          });
+
+          // Recursively parse the child sitemap
+          const childUrls = await this.parseSitemapXmlRecursive(
+            result.html,
+            baseUrl,
+            depth + 1,
+            maxDepth
+          );
+          allUrls.push(...childUrls);
+          console.log(
+            `[Sitemap] Added ${childUrls.length} URLs from ${childUrl}`
+          );
+        } catch (error) {
+          console.error(
+            `[Sitemap] Failed to fetch child sitemap ${childUrl}:`,
+            error
+          );
+          // Continue with other sitemaps
+        }
       }
-      return urls;
+
+      return allUrls;
     }
+
+    // Handle regular sitemap
+    return this.parseSitemapXml(xml);
+  }
+
+  /**
+   * Extract sitemap locations from a sitemap index
+   */
+  private extractSitemapLocations(xml: string): string[] {
+    const sitemapUrls: string[] = [];
+    const sitemapPattern = /<sitemap>([\s\S]*?)<\/sitemap>/g;
+    let match;
+
+    while ((match = sitemapPattern.exec(xml)) !== null) {
+      const sitemapBlock = match[1];
+      const locMatch = sitemapBlock.match(/<loc>([^<]+)<\/loc>/);
+      if (locMatch) {
+        sitemapUrls.push(locMatch[1]);
+      }
+    }
+
+    return sitemapUrls;
+  }
+
+  /**
+   * Parse sitemap XML content (non-recursive, for regular sitemaps only)
+   */
+  private parseSitemapXml(xml: string): SitemapUrl[] {
+    const urls: SitemapUrl[] = [];
 
     // Handle regular sitemap
     const urlPattern = /<url>([\s\S]*?)<\/url>/g;
